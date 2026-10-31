@@ -70,7 +70,7 @@ cc -O3 -std=c11 -Wall -Wextra count_patterns.c -o count_patterns
 ./count_patterns candidates.tsv 12000000 100003 > observations.csv
 ./count_patterns candidates.tsv 30000000 12000001 > range_12m_30m.csv
 # or rerun all four disjoint ranges and aggregate:
-./run_lab.sh
+sh run_lab.sh
 ```
 
 `test_bridge_rank.py` cross-checks the exact singular-series ratio with independently assembled rational Euler factors, verifies Pareto dominance across multiple scales, checks invalid inputs, and independently reproduces a small C prime-counting sample with a separate Python sieve. Benchmark CSV and JSON reports are included for auditability.
