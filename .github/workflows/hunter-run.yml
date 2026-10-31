@@ -1,0 +1,38 @@
+name: Hunter campaign
+on:
+  workflow_dispatch:
+jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev python3-gmpy2 cargo
+          python3 -m pip install --break-system-packages gmpy2
+      - name: Build Praetor
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          cd /tmp/Praetor
+          cargo build --release -p ourc
+      - name: Build Hunter
+        env:
+          OURC: /tmp/Praetor/target/release/ourc
+          OUR_RUNTIME: /tmp/Praetor/compiler/runtime
+        run: ./build.sh
+      - name: Hunt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -u campaign.py
+      - name: Save results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-campaign-state
+          path: campaign/
+          retention-days: 3
