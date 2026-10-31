@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gap Hunter</title>
+<style>
+:root{--bg:#f7f5f0;--card:#fffefb;--fg:#1d1c1a;--mut:#77736b;--line:#e4e0d6;--acc:#b5532a;--accbg:#f6e7df;--ok:#2f7d4f;--okbg:#e2f1e7;--warn:#9a6a00;--warnbg:#f8eed2;--bad:#b23a3a;--badbg:#f6e0e0;
+--c0:#b5532a;--c1:#2f6f8f;--c2:#5f8a2e;--c3:#8a5aa8;--c4:#b8901a;--c5:#4b4b4b;--c6:#c2577f;--c7:#2e8a7f;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141311;--card:#1c1b18;--fg:#ece9e2;--mut:#9a958b;--line:#2e2c27;--acc:#e07a4f;--accbg:#3a2419;--ok:#6fcf97;--okbg:#17301f;--warn:#e7c25a;--warnbg:#332a12;--bad:#ef8080;--badbg:#3a1b1b;
+--c0:#e07a4f;--c1:#6fb2d4;--c2:#9cc463;--c3:#c095dd;--c4:#e2c04d;--c5:#bbb;--c6:#ea8fb3;--c7:#6ad1c2}}
+:root[data-theme="dark"]{--bg:#141311;--card:#1c1b18;--fg:#ece9e2;--mut:#9a958b;--line:#2e2c27;--acc:#e07a4f;--accbg:#3a2419;--ok:#6fcf97;--okbg:#17301f;--warn:#e7c25a;--warnbg:#332a12;--bad:#ef8080;--badbg:#3a1b1b;
+--c0:#e07a4f;--c1:#6fb2d4;--c2:#9cc463;--c3:#c095dd;--c4:#e2c04d;--c5:#bbb;--c6:#ea8fb3;--c7:#6ad1c2}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14.5px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;margin:0;padding:20px 16px 60px}
+main{max-width:1120px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:14px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em} .sub{color:var(--mut);font-size:13px}
+h2{font-size:13px;text-transform:lowercase;letter-spacing:.05em;color:var(--mut);margin:0 0 10px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mut)} .on .dot{background:var(--ok);box-shadow:0 0 0 4px var(--okbg);animation:p 1.6s infinite}
+@keyframes p{50%{box-shadow:0 0 0 7px transparent}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px} @media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px} .kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .kpi span{color:var(--mut);font-size:12px}
+.kpi.hot b{color:var(--acc)}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums} th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle} th{color:var(--mut);font-weight:500;font-size:12px}
+.tw{overflow-x:auto} .mono{font-family:var(--mono);font-size:12px} .muted{color:var(--mut)} .r{text-align:right}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;white-space:nowrap}
+.b-ok{background:var(--okbg);color:var(--ok)} .b-warn{background:var(--warnbg);color:var(--warn)} .b-bad{background:var(--badbg);color:var(--bad)} .b-acc{background:var(--accbg);color:var(--acc)} .b-mut{background:var(--line);color:var(--mut)}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--mut)} button.pri{background:var(--acc);border-color:var(--acc);color:#fff} button.dang{color:var(--bad)} button:disabled{opacity:.45;cursor:default}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+input[type=number],input[type=text],select{font:inherit;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:110px}
+.arms{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px} .arms label{display:flex;gap:5px;align-items:center;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--mono)}
+.workers{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.w{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px} .w b{font-family:var(--mono);font-size:12px} .w .muted{font-size:11.5px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;min-width:60px} .bar i{display:block;height:100%;background:var(--acc)}
+.bar.rec i{background:var(--ok)}
+.feed td{padding:4px 8px} .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1}
+pre{font-family:var(--mono);font-size:11.5px;max-height:260px;overflow:auto;margin:0;white-space:pre-wrap;color:var(--mut)}
+svg{width:100%;height:auto;display:block} .grid{stroke:var(--line)} .tick{fill:var(--mut);font-size:10.5px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--mut);margin-top:6px} .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.empty{color:var(--mut);font-size:13px;padding:6px 0}
+.hint{font-size:12px;color:var(--mut);margin-top:8px}
+</style></head><body><main>
+<header>
+  <div><h1>gap hunter</h1><div class="sub">rb labs · prime gap record hunting control room</div></div>
+  <div class="row"><span id="pill" class="pill"><span class="dot"></span><span id="pilltxt">connecting…</span></span>
+  <button id="theme" title="toggle theme">◐</button></div>
+</header>
+
+<div class="card" id="controls">
+  <h2>hunt</h2>
+  <div class="row" style="align-items:flex-end">
+    <label class="f">hours<input id="hours" type="number" min="0.1" step="0.5" value="8"></label>
+    <label class="f">cores<input id="cores" type="number" min="1" value="14"></label>
+    <label class="f">job length<select id="jobsecs"><option value="300">5 min</option><option value="600" selected>10 min</option><option value="1200">20 min</option></select></label>
+    <label class="f">credit as<input id="disc" type="text" value="B.Rouyea" maxlength="8"></label>
+    <button class="pri" id="start">start hunt</button>
+    <button id="stop">stop after jobs</button>
+    <button class="dang" id="stopnow">stop now</button>
+    <button id="upd">refresh record book</button>
+  </div>
+  <div class="arms" id="arms"></div>
+  <div class="hint">setups are P#/d families. the learner prices each one with a sieve-only dry run first, then spends real time where records come fastest. leave them all on unless you have a reason.</div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">records</h2>
+  <div class="row"><button id="chk">check live table</button><button id="copyall">copy open lines</button><button id="marksub">mark open as submitted</button><button id="ver">verify</button>
+  <a href="https://primegaps.cloudygo.com/" target="_blank" rel="noopener"><button>submission site ↗</button></a></div></div>
+  <div class="tw" style="margin-top:10px"><table id="found"></table></div>
+  <div class="hint" id="tblhint"></div>
+</div>
+
+<div class="grid2">
+  <div class="card"><h2>cores, live</h2><div class="workers" id="workers"></div></div>
+  <div class="card"><h2>just tested</h2><div class="tw"><table class="feed" id="feed"></table></div></div>
+</div>
+
+<div class="card"><h2>learner: where records come fastest (records per core-hour)</h2><div class="tw"><table id="armtbl"></table></div>
+<div class="hint">est = posterior mean (dry-run price + real jobs). range = 90% interval. calibration = model-predicted vs seen gaps with merit ≥ 15 among tested centers.</div></div>
+
+<div class="card"><h2>rate per job</h2><div id="chart"></div></div>
+
+<div class="grid2">
+  <div class="card"><h2>is the model still honest?</h2><div id="model"></div></div>
+  <div class="card"><h2>closest calls (merit ÷ record)</h2><div class="tw"><table id="near"></table></div></div>
+</div>
+
+<div class="card"><h2>log</h2><pre id="log"></pre></div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let S=null, armsInit=false;
+try{const t=localStorage.getItem('gh-theme'); if(t) document.documentElement.dataset.theme=t;}catch(e){}
+$('theme').onclick=()=>{const r=document.documentElement; const cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); r.dataset.theme=cur==='dark'?'light':'dark'; try{localStorage.setItem('gh-theme',r.dataset.theme)}catch(e){}};
+function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200)}
+async function post(path,body){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); toast(j.msg||'done'); refresh();}catch(e){toast('request failed: '+e)}}
+const fmt=(x,d=2)=>x==null?'—':(Math.abs(x)>=1000||Math.abs(x)<0.01&&x!==0)?Number(x).toExponential(d):Number(x).toFixed(d);
+const ago=t=>{const s=Math.max(0,Date.now()/1000-t); return s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+'m':Math.round(s/3600)+'h'};
+const hm=s=>{s=Math.max(0,s);const h=Math.floor(s/3600),m=Math.round((s%3600)/60);return h?`${h}h ${m}m`:`${m}m`};
+const COLORS=['--c0','--c1','--c2','--c3','--c4','--c5','--c6','--c7'];
+function col(key){const ks=(S?.arms||[]).map(a=>a.key).sort(); const i=Math.max(0,ks.indexOf(key)); return `var(${COLORS[i%COLORS.length]})`}
+
+function render(){
+  const s=S, live=s.live||{};
+  // pill + controls
+  const on=s.alive; $('pill').classList.toggle('on',on);
+  const nw=Object.keys(live.workers||{}).length;
+  $('pilltxt').textContent= on?`hunting · ${nw} cores busy · ${hm((live.ends||0)-s.now)} left`:'idle';
+  $('start').disabled=on; $('stop').disabled=!on; $('stopnow').disabled=!on;
+  if(!armsInit){ const all=[...new Set([...(s.default_arms||[]),...(s.current_arms||[]),...s.arms.map(a=>a.key)])];
+    const cur=new Set(s.current_arms||[]);
+    $('arms').innerHTML=all.map(k=>`<label><input type="checkbox" value="${esc(k)}" ${cur.has(k)?'checked':''}>${esc(k.replace('_L1e9',''))}</label>`).join('');
+    $('cores').value=Math.max(1,(s.cpu||4)-2); $('cores').max=s.cpu||64; $('disc').value=s.cfg.discoverer||'B.Rouyea'; armsInit=true; }
+  // kpis
+  const F=s.found, ver=F.filter(r=>r.verified==='OK').length, onT=F.filter(r=>r.table==='on the table').length, open=F.filter(r=>r.table==='open: submit it').length;
+  const rate=s.coreh>0?s.expected/s.coreh:0, cores=on?(live.cores||nw):(+$('cores').value||1);
+  const k=[['records found',F.length,'hot'],['verified',ver],['on the table',onT],['open to submit',open,open?'hot':''],
+    ['expected (model)',fmt(s.expected,2)],['core-hours',fmt(s.coreh,1)],['centers tested',s.tested.toLocaleString()],
+    ['pace: records/day',fmt(rate*cores*24,1)]];
+  $('kpis').innerHTML=k.map(([l,v,c])=>`<div class="kpi ${c||''}"><b>${v}</b><span>${l}</span></div>`).join('');
+  // records
+  if(!F.length) $('found').innerHTML='<tr><td class="empty">none yet. they show up here the second a core finds one.</td></tr>';
+  else $('found').innerHTML='<tr><th>gap</th><th>merit</th><th>beats</th><th>start prime</th><th>verified</th><th>table</th><th></th></tr>'+
+    F.slice().reverse().map(r=>{const vb=r.verified==='OK'?'b-ok':r.verified==='pending'?'b-warn':'b-bad';
+      const tb={'on the table':'b-ok','open: submit it':'b-acc','submitted, waiting':'b-warn','beaten':'b-bad','unchecked':'b-mut'}[r.table]||'b-mut';
+      const tt=r.table==='beaten'?`beaten (${esc(r.table_holder)} ${fmt(r.table_merit,4)})`:r.table;
+      return `<tr><td><b>${r.gap.toLocaleString()}</b></td><td>${r.merit.toFixed(4)}</td><td class="muted">${esc(r.old)}</td><td class="mono">${esc(r.expr)}</td>
+      <td><span class="badge ${vb}">${esc(r.verified==='OK'?'verified':r.verified)}</span></td><td><span class="badge ${tb}">${esc(tt)}</span></td>
+      <td><button data-line="${esc(r.gap+'  '+r.merit.toFixed(4)+'  '+r.expr)}" class="cp">copy</button></td></tr>`}).join('');
+  document.querySelectorAll('.cp').forEach(b=>b.onclick=()=>copy(b.dataset.line));
+  $('tblhint').textContent=s.table_checked?`live table checked ${ago(s.table_checked)} ago. submit with "credit as" = ${s.cfg.discoverer}, tap add once.`:'tap "check live table" to see which records are still open.';
+  // workers
+  const W=Object.entries(live.workers||{}).sort((a,b)=>+a[0]-+b[0]);
+  $('workers').innerHTML=W.length?W.map(([id,w])=>`<div class="w"><div class="row" style="justify-content:space-between"><b>core ${id}</b><span class="muted">${hm(s.now-w.started)}</span></div>
+    <div style="color:${col(w.arm)};font-family:var(--mono);font-size:11.5px">${esc(w.arm.replace('_L1e9',''))}${w.dry?' · pricing':''}</div>
+    <div>${w.dry?'dry run (sieve only)':w.tested+' tested'}</div><div class="muted">${esc(w.last||'sieving…')}</div></div>`).join(''):'<div class="empty">no cores running.</div>';
+  // feed
+  const R=(live.recent||[]).slice(-14).reverse();
+  $('feed').innerHTML=R.length?'<tr><th>when</th><th>gap</th><th>merit</th><th>record</th><th>vs record</th></tr>'+R.map(r=>{
+    const x=r.done&&r.rec>0?r.merit/r.rec:0; return `<tr><td class="muted">${ago(r.t)}</td><td>${r.done?r.gap.toLocaleString():'—'}</td><td>${r.done?r.merit.toFixed(2):'<span class="muted">dropped after one side</span>'}</td><td class="muted">${r.done?r.rec.toFixed(2):''}</td>
+    <td>${r.done?`<div class="bar ${x>=1?'rec':''}" title="${(100*x).toFixed(0)}%"><i style="width:${Math.min(100,100*x)}%"></i></div>`:''}${r.hit?' <span class="badge b-ok">record!</span>':''}</td></tr>`}).join(''):'<tr><td class="empty">waiting for the first tested center…</td></tr>';
+  // learner
+  const A=s.arms, P=A.filter(a=>a.est!=null), mx=Math.max(...P.map(a=>a.hi),1e-9), mn=Math.min(...P.filter(a=>a.lo>0).map(a=>a.lo),mx/1e3);
+  const pos=v=>v<=0?0:100*(Math.log(v)-Math.log(mn))/(Math.log(mx)-Math.log(mn)+1e-9);
+  $('armtbl').innerHTML='<tr><th>setup</th><th class="r">est</th><th style="width:28%">range (log)</th><th class="r">dry price</th><th class="r">jobs</th><th class="r">core-h</th><th class="r">tested</th><th class="r">records</th><th class="r">calibration</th></tr>'+
+    A.map(a=>a.est==null?`<tr><td class="mono" style="color:${col(a.key)}">${esc(a.key.replace('_L1e9',''))}</td><td class="r muted">not priced yet</td><td></td><td></td><td class="r">0</td><td class="r">0.0</td><td class="r">0</td><td class="r">0</td><td></td></tr>`:`<tr><td class="mono" style="color:${col(a.key)}">${esc(a.key.replace('_L1e9',''))}</td><td class="r"><b>${fmt(a.est,3)}</b></td>
+    <td><div style="position:relative;height:10px;background:var(--line);border-radius:5px"><div style="position:absolute;left:${pos(a.lo)}%;width:${Math.max(2,pos(a.hi)-pos(a.lo))}%;top:0;bottom:0;background:${col(a.key)};opacity:.45;border-radius:5px"></div><div style="position:absolute;left:${pos(a.est)}%;top:-2px;width:3px;height:14px;background:${col(a.key)}"></div></div></td>
+    <td class="r muted">${a.prior?fmt(a.prior,3):'—'}</td><td class="r">${a.jobs}</td><td class="r">${a.coreh.toFixed(1)}</td><td class="r">${a.tested}</td><td class="r">${a.hits}</td><td class="r muted">${a.tested?a.pcal.toFixed(1)+' / '+a.calhits:'—'}</td></tr>`).join('');
+  // chart
+  chart(s.jobs);
+  // model
+  const m=s.model;
+  if(!m||!m.nR) $('model').innerHTML='<div class="empty">needs some tested centers first.</div>';
+  else{ const okR=Math.abs(m.ratioR-1)<2.5*m.errR, okL=!m.nL||Math.abs(m.ratioL-1)<2.5*m.errL;
+    $('model').innerHTML=`<div class="hint" style="margin-top:0">each sieve survivor should be prime with probability q = 1/(ln N · ∏(1−1/p)). measured ÷ predicted, from ${m.nR.toLocaleString()} right sides and ${m.nL.toLocaleString()} left sides:</div>
+    <table style="margin:8px 0"><tr><th>side</th><th class="r">measured ÷ model</th><th class="r">± (1σ)</th><th></th></tr>
+    <tr><td>right</td><td class="r"><b>${m.ratioR.toFixed(3)}</b></td><td class="r muted">${m.errR.toFixed(3)}</td><td><span class="badge ${okR?'b-ok':'b-bad'}">${okR?'honest':'drifting'}</span></td></tr>
+    <tr><td>left</td><td class="r"><b>${m.nL?m.ratioL.toFixed(3):'—'}</b></td><td class="r muted">${m.nL?m.errL.toFixed(3):''}</td><td><span class="badge ${okL?'b-ok':'b-bad'}">${okL?'honest':'drifting'}</span></td></tr></table>
+    <table><tr><th>tail: P(longer than this)</th>${m.thr.map(t=>`<th class="r">${t}</th>`).join('')}</tr>
+    <tr><td class="muted">right, seen</td>${m.pitR.map(v=>`<td class="r">${v.toFixed(4)}</td>`).join('')}</tr>
+    <tr><td class="muted">left, seen</td>${m.pitL.map(v=>`<td class="r">${v.toFixed(4)}</td>`).join('')}</tr></table>
+    <div class="hint">if the model is right, each "seen" number matches the column header. that's what lets the learner price setups without testing them.</div>`;}
+  $('near').innerHTML=m&&m.near.length?'<tr><th>gap</th><th class="r">merit</th><th class="r">record</th><th style="width:35%"></th></tr>'+m.near.slice(0,10).map(n=>`<tr><td>${n.gap.toLocaleString()}</td><td class="r">${n.merit.toFixed(3)}</td><td class="r muted">${n.rec.toFixed(3)}</td>
+    <td><div class="bar ${n.ratio>=1?'rec':''}"><i style="width:${Math.min(100,100*n.ratio)}%"></i></div></td></tr>`).join(''):'<tr><td class="empty">none yet.</td></tr>';
+  $('log').textContent=(s.log||[]).slice(-40).join('\n');
+}
+function chart(J){
+  const el=$('chart'); if(!J||!J.length){el.innerHTML='<div class="empty">no finished jobs yet.</div>';return}
+  const W=1000,H=230,p=44; const ts=J.map(j=>j.t), t0=Math.min(...ts), t1=Math.max(...ts)+1;
+  const ys=J.map(j=>Math.log10(Math.max(j.rate,1e-6))); let y0=Math.floor(Math.min(...ys)), y1=Math.ceil(Math.max(...ys)); if(y1===y0) y1++;
+  const X=t=>p+(W-2*p)*(t-t0)/(t1-t0), Y=y=>H-26-(H-40)*(y-y0)/(y1-y0);
+  let g=''; for(let k=y0;k<=y1;k++) g+=`<line x1="${p}" x2="${W-p/2}" y1="${Y(k)}" y2="${Y(k)}" class="grid"/><text x="${p-6}" y="${Y(k)+4}" class="tick" text-anchor="end">1e${k}</text>`;
+  const pts=J.map(j=>`<circle cx="${X(j.t).toFixed(1)}" cy="${Y(Math.log10(Math.max(j.rate,1e-6))).toFixed(1)}" r="3.6" fill="${col(j.arm)}"><title>${esc(j.arm)}: ${fmt(j.rate,3)}/core-h</title></circle>`).join('');
+  const arms=[...new Set(J.map(j=>j.arm))];
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="records per core-hour per job">${g}${pts}<text x="${p}" y="${H-6}" class="tick">${new Date(t0*1000).toLocaleString()}</text><text x="${W-p/2}" y="${H-6}" class="tick" text-anchor="end">${new Date(t1*1000).toLocaleTimeString()}</text></svg>
+  <div class="legend">${arms.map(a=>`<span><i style="background:${col(a)}"></i>${esc(a.replace('_L1e9',''))}</span>`).join('')}</div>`;
+}
+async function copy(text){try{await navigator.clipboard.writeText(text); toast('copied')}catch(e){prompt('copy this:',text)}}
+async function refresh(){try{const r=await fetch('/api/status'); S=await r.json(); if(S.error){toast(S.error);return} render()}catch(e){$('pilltxt').textContent='control room offline'}}
+$('start').onclick=()=>{const arms=[...document.querySelectorAll('#arms input:checked')].map(i=>i.value); post('/api/config',{discoverer:$('disc').value}); post('/api/start',{hours:+$('hours').value,cores:+$('cores').value,job_secs:+$('jobsecs').value,arms})};
+$('stop').onclick=()=>post('/api/stop',{});
+$('stopnow').onclick=()=>{if(confirm('kill running jobs now? centers in progress are lost (records already found are safe).')) post('/api/stop',{now:true})};
+$('upd').onclick=()=>post('/api/update-records');
+$('chk').onclick=()=>{toast('checking the live table…'); post('/api/check-table')};
+$('ver').onclick=()=>post('/api/verify');
+$('disc').onchange=()=>post('/api/config',{discoverer:$('disc').value});
+const openRows=()=>(S?.found||[]).filter(r=>r.table==='open: submit it'&&r.verified==='OK');
+$('copyall').onclick=()=>{const o=openRows(); if(!o.length){toast('nothing open + verified. check the live table first.');return} copy(o.map(r=>`${r.gap}  ${r.merit.toFixed(4)}  ${r.expr}`).join('\n'))};
+$('marksub').onclick=()=>{const o=openRows(); if(!o.length){toast('nothing open to mark');return} post('/api/submitted',{gaps:o.map(r=>r.gap)})};
+refresh(); setInterval(refresh,3000);
+</script></body></html>

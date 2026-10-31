@@ -1,0 +1,27 @@
+# build output
+/hunter
+/build/
+# runtime state: stays on your machine
+/run/
+state.tsv
+gaps.tsv
+jobs.tsv
+hunt.log
+FOUND.tsv
+VERIFIED.tsv
+table.tsv
+submitted.txt
+bench.txt
+config.txt
+merits.tmp
+records.bak
+*.tmp
+# python fallback build/runtime files
+python-v3/hunt
+python-v3/*.tsv
+python-v3/*.json
+python-v3/*.jsonl
+python-v3/hunt.log
+python-v3/STOP
+python-v3/records.txt
+.DS_Store

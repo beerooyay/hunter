@@ -1,0 +1,2730 @@
+// hunter.lang -- the rb labs prime gap hunter, written in Praetor.
+//
+//   hunter hunt P d m0 M SL L lambda mcal records.txt     the engine (same contract as the C hunt)
+//   hunter bench [P d count]                              cpu vs gpu prime-test throughput
+//   hunter serve [port]                                   the control room
+//
+// Praetor has no floating point, so the whole probability model is exact fixed-point integer
+// arithmetic: probabilities are Q62 (1.0 = 2^62), logarithms are Q32, and every product goes
+// through a 64x64 -> 128-bit multiply built from 32-bit halves. Big integers are GMP via FFI.
+
+import std.io;
+import std.process;
+import std.fs;
+import std.vec;
+import std.result;
+import std.net;
+import std.thread;
+
+// ---------------------------------------------------------------- FFI
+extern fn mml_fd_write(fd: i32, buf: *const void, n: u64) -> i64;
+extern fn rt_now_ns() -> u64;
+extern fn rt_cpu_ns() -> u64;
+extern fn rt_unix_s() -> u64;
+extern fn rt_ncpu() -> i64;
+extern fn rt_alloc64(n: u64) -> *u64;
+extern fn rt_alloc32(n: u64) -> *u32;
+extern fn rt_alloc8(n: u64) -> *u8;
+extern fn rt_free(p: *void);
+extern fn rt_zero(p: *void, bytes: u64);
+extern fn rt_mpz() -> *void;
+extern fn rt_mpz_free(z: *void);
+extern fn rt_mpz_odd(z: *void) -> i32;
+extern fn rt_pack(z: *void, n: *u32, r: *u32, nl: i32) -> i32;
+extern fn rt_gpu_available() -> i32;
+extern fn rt_gpu_fermat_batch(nums: *u32, rmods: *u32, nl: i32, count: i32, out: *u8) -> i32;
+extern fn rt_cpu_fermat_batch(nums: *u32, rmods: *u32, nl: i32, count: i32, out: *u8) -> i32;
+extern fn rt_gpu_name() -> *const u8;
+extern fn rt_gpu_set_mode(m: i32);
+extern fn rt_gpu_error() -> *const u8;
+extern fn rt_strlen(s: *const u8) -> u64;
+extern fn rt_mpz_bits(z: *void) -> i32;
+extern fn memcpy(dst: *void, src: *const void, n: u64) -> *void;
+extern fn __gmpz_primorial_ui(z: *void, n: u64);
+extern fn __gmpz_divexact_ui(r: *void, a: *void, d: u64);
+extern fn __gmpz_divisible_ui_p(a: *void, d: u64) -> i32;
+extern fn __gmpz_fdiv_ui(a: *void, d: u64) -> u64;
+extern fn __gmpz_mul_ui(r: *void, a: *void, b: u64);
+extern fn __gmpz_add_ui(r: *void, a: *void, b: u64);
+extern fn __gmpz_sub_ui(r: *void, a: *void, b: u64);
+extern fn __gmpz_probab_prime_p(a: *void, reps: i32) -> i32;
+extern fn __gmpz_set_ui(a: *void, v: u64);
+extern fn __gmpz_sizeinbase(a: *void, base: i32) -> u64;
+extern fn __gmpz_gcd(r: *void, a: *void, b: *void);
+extern fn __gmpz_cmp_ui(a: *void, v: u64) -> i32;
+
+// ---------------------------------------------------------------- 128-bit + fixed point
+struct Wide { hi: u64, lo: u64 }
+
+fn mulw(a: u64, b: u64) -> Wide {
+    let m: u64 = 0xFFFF_FFFF;
+    let a0 = a & m; let a1 = a >> 32; let b0 = b & m; let b1 = b >> 32;
+    let p00 = a0 * b0; let p01 = a0 * b1; let p10 = a1 * b0; let p11 = a1 * b1;
+    let mid = (p00 >> 32) + (p01 & m) + (p10 & m);
+    return Wide { hi: p11 + (p01 >> 32) + (p10 >> 32) + (mid >> 32), lo: (mid << 32) | (p00 & m) };
+}
+
+// (a*b) >> s for 1 <= s <= 127, result assumed to fit in 64 bits
+fn mulsh(a: u64, b: u64, s: u64) -> u64 {
+    let w = mulw(a, b);
+    if s >= 64 {
+        if s == 64 { return w.hi; }
+        return w.hi >> (s - 64);
+    }
+    return (w.hi << (64 - s)) | (w.lo >> s);
+}
+
+fn mulhi(a: u64, b: u64) -> u64 {
+    let w = mulw(a, b);
+    return w.hi;
+}
+
+fn mq(a: u64, b: u64) -> u64 { return mulsh(a, b, 62); }   // Q62 product
+fn one62() -> u64 { return u64(1) << 62; }
+
+// floor(a*b/d) through a 128-bit dividend (bitwise long division; d < 2^63)
+fn muldiv(a: u64, b: u64, d: u64) -> u64 {
+    let w = mulw(a, b);
+    let q: u64 = 0;
+    let r: u64 = 0;
+    let i: u64 = 0;
+    while i < 128 {
+        let bit: u64 = 0;
+        if i < 64 { bit = (w.hi >> (63 - i)) & 1; } else { bit = (w.lo >> (127 - i)) & 1; }
+        r = (r << 1) | bit;
+        q = q << 1;
+        if r >= d { r = r - d; q = q | 1; }
+        i = i + 1;
+    }
+    return q;
+}
+
+// floor(2^e / d), e <= 127
+fn divpow2(e: u64, d: u64) -> u64 {
+    let q: u64 = 0;
+    let r: u64 = 0;
+    let i: u64 = 0;
+    while i <= e {
+        let bit: u64 = 0;
+        if i == 0 { bit = 1; }
+        r = (r << 1) | bit;
+        q = q << 1;
+        if r >= d { r = r - d; q = q | 1; }
+        i = i + 1;
+    }
+    return q;
+}
+
+// natural log in Q32 for x >= 1: log2 by repeated squaring of the Q62 mantissa, times ln 2
+fn ln_q32(x: u64) -> u64 {
+    if x <= 1 { return 0; }
+    let n: u64 = 63;
+    while ((x >> n) & 1) == 0 { n = n - 1; }
+    let y: u64 = 0;
+    if n <= 62 { y = x << (62 - n); } else { y = x >> 1; }
+    let f: u64 = 0;
+    let bit: u64 = u64(1) << 40;
+    let two: u64 = u64(1) << 63;
+    let i: u64 = 0;
+    while i < 41 {
+        y = mq(y, y);
+        if y >= two { y = y >> 1; f = f | bit; }
+        bit = bit >> 1;
+        i = i + 1;
+    }
+    let lg = (n << 41) | f;                     // log2(x), Q41
+    let ln2: u64 = 3196577161300663914;        // ln 2, Q62
+    return mulsh(lg, ln2, 71);                  // Q41 * Q62 >> 71 = Q32
+}
+
+// ---------------------------------------------------------------- output buffer
+struct Out { p: *u8, cap: u64, len: u64, fd: i32 }
+
+fn out_new(fd: i32, cap: u64) -> Out {
+    return Out { p: rt_alloc8(cap), cap: cap, len: 0, fd: fd };
+}
+
+fn flush(write o: Out) {
+    if o.len > 0 {
+        let s = slice(o.p, o.cap);
+        mml_fd_write(o.fd, &s[0], o.len);
+        o.len = 0;
+    }
+}
+
+fn grow(write o: Out) {                       // in-memory buffers (fd < 0) double instead of flushing
+    let nc = o.cap * 2;
+    let np = rt_alloc8(nc);
+    memcpy(np, o.p, o.len);
+    rt_free(o.p);
+    o.p = np;
+    o.cap = nc;
+}
+
+fn pb(write o: Out, b: u8) {
+    if o.len + 1 >= o.cap { if o.fd < 0 { grow(o); } else { flush(o); } }
+    let s = slice(o.p, o.cap);
+    s[o.len] = b;
+    o.len = o.len + 1;
+}
+
+fn ps(write o: Out, t: str) {
+    let i: u64 = 0;
+    while i < t.len { pb(o, t.bytes[i]); i = i + 1; }
+}
+
+fn pu(write o: Out, n: u64) {
+    let d: [24]u8;
+    d[0] = 48;
+    let k: u64 = 0;
+    let m = n;
+    if m == 0 { k = 1; }
+    while m != 0 { d[k] = 48 + u8(m % 10); m = m / 10; k = k + 1; }
+    while k > 0 { k = k - 1; pb(o, d[k]); }
+}
+
+fn pi(write o: Out, n: i64) {
+    if n < 0 { pb(o, 45); pu(o, u64(0) - u64(n)); } else { pu(o, u64(n)); }
+}
+
+fn tab(write o: Out) { pb(o, 9); }
+
+// fixed decimal: v / 2^f printed with nd decimals (f <= 60, integer part < 2^(64-f))
+fn pfix(write o: Out, v: u64, f: u64, nd: u64) {
+    // round: add half a unit in the last place
+    let unit: u64 = 1;
+    let k: u64 = 0;
+    while k < nd { unit = unit * 10; k = k + 1; }
+    let ip = v >> f;
+    let fr = v & ((u64(1) << f) - 1);
+    let scaled = (muldiv(fr, unit * 2, u64(1) << f) + 1) / 2;   // round half up
+    if scaled >= unit { ip = ip + 1; scaled = scaled - unit; }
+    pu(o, ip);
+    if nd > 0 {
+        pb(o, 46);
+        let digs: [24]u8;
+        digs[0] = 48;
+        let j: u64 = 0;
+        let s = scaled;
+        while j < nd { digs[j] = 48 + u8(s % 10); s = s / 10; j = j + 1; }
+        while j > 0 { j = j - 1; pb(o, digs[j]); }
+    }
+}
+
+// scientific: v / 2^f as d.dddde-XX with nd decimals (like printf %.{nd}e)
+fn psci(write o: Out, v: u64, f: u64, nd: u64) {
+    if v == 0 {
+        ps(o, "0.");
+        let z: u64 = 0;
+        while z < nd { pb(o, 48); z = z + 1; }
+        ps(o, "e+00");
+        return;
+    }
+    // integer part and 40 fractional decimal digits into a digit string
+    let dg: [80]u8;
+    dg[0] = 0;
+    let n: u64 = 0;
+    let ip = v >> f;
+    let fr = v & ((u64(1) << f) - 1);
+    let tmp: [24]u8;
+    tmp[0] = 0;
+    let ti: u64 = 0;
+    let m = ip;
+    while m != 0 { tmp[ti] = u8(m % 10); m = m / 10; ti = ti + 1; }
+    let intdigits = ti;
+    while ti > 0 { ti = ti - 1; dg[n] = tmp[ti]; n = n + 1; }
+    // fraction digits: shift fr to Q60 so x10 never overflows
+    let fr60: u64 = 0;
+    if f >= 60 { fr60 = fr >> (f - 60); } else { fr60 = fr << (60 - f); }
+    let mask60 = (u64(1) << 60) - 1;
+    let k: u64 = 0;
+    while k < 40 {
+        fr60 = fr60 * 10;
+        dg[n] = u8(fr60 >> 60);
+        fr60 = fr60 & mask60;
+        n = n + 1;
+        k = k + 1;
+    }
+    // first significant digit
+    let first: u64 = 0;
+    while first < n && dg[first] == 0 { first = first + 1; }
+    if first >= n { ps(o, "0.0000e+00"); return; }
+    let exp: i64 = i64(intdigits) - 1 - i64(first);
+    // round to nd+1 significant digits
+    let last = first + nd;
+    if last + 1 < n && dg[last + 1] >= 5 {
+        let j = last;
+        let carry = true;
+        while carry {
+            dg[j] = dg[j] + 1;
+            if dg[j] == 10 {
+                dg[j] = 0;
+                if j == first {
+                    // 9.999 -> 10.000: shift
+                    if first == 0 { carry = false; dg[0] = 1; exp = exp + 1; } else { first = first - 1; dg[first] = 1; exp = exp + 1; carry = false; }
+                } else { j = j - 1; }
+            } else { carry = false; }
+        }
+    }
+    pb(o, 48 + dg[first]);
+    pb(o, 46);
+    let t: u64 = 1;
+    while t <= nd { pb(o, 48 + dg[first + t]); t = t + 1; }
+    pb(o, 101);
+    if exp < 0 { pb(o, 45); exp = 0 - exp; } else { pb(o, 43); }
+    if exp < 10 { pb(o, 48); }
+    pu(o, u64(exp));
+}
+
+// ---------------------------------------------------------------- parsing
+fn isdig(b: u8) -> bool { return b >= 48 && b <= 57; }
+
+// decimal "12.3456" at s[i..] -> Q32; advances nothing (caller finds tokens)
+fn parse_q32(s: slice u8, lo: u64, hi: u64) -> u64 {
+    let ip: u64 = 0;
+    let i = lo;
+    while i < hi && isdig(s[i]) { ip = ip * 10 + u64(s[i] - 48); i = i + 1; }
+    let fr: u64 = 0;
+    let den: u64 = 1;
+    if i < hi && s[i] == 46 {
+        i = i + 1;
+        while i < hi && isdig(s[i]) && den < 1000000000000 { fr = fr * 10 + u64(s[i] - 48); den = den * 10; i = i + 1; }
+    }
+    return (ip << 32) + muldiv(fr, u64(1) << 32, den);
+}
+
+// "2.953504e-05" or "0" -> Q62 (values < 4)
+fn parse_sci_q62(s: str) -> u64 { return parse_sci_s(s.bytes, 0, s.len); }
+
+fn parse_sci_s(b: slice u8, lo: u64, hi: u64) -> u64 {
+    let mant: u64 = 0;
+    let fd: i64 = 0;
+    let seen_dot = false;
+    let i = lo;
+    while i < hi && (isdig(b[i]) || b[i] == 46) {
+        if b[i] == 46 { seen_dot = true; } else {
+            if mant < 100000000000000000 { mant = mant * 10 + u64(b[i] - 48); if seen_dot { fd = fd + 1; } }
+        }
+        i = i + 1;
+    }
+    let ex: i64 = 0;
+    if i < hi && (b[i] == 101 || b[i] == 69) {
+        i = i + 1;
+        let neg = false;
+        if i < hi && b[i] == 45 { neg = true; i = i + 1; } else { if i < hi && b[i] == 43 { i = i + 1; } }
+        while i < hi && isdig(b[i]) { ex = ex * 10 + i64(b[i] - 48); i = i + 1; }
+        if neg { ex = 0 - ex; }
+    }
+    let k = fd - ex;                // value = mant / 10^k
+    if mant == 0 { return 0; }
+    if k > 36 { return 0; }
+    let v = mant;
+    let sh: u64 = 62;
+    // value * 2^62 = mant * 2^62 / 10^k
+    if k <= 0 {
+        let j: i64 = 0;
+        while j < 0 - k { v = v * 10; j = j + 1; }
+        return v << 62;
+    }
+    // divide in two steps to keep 10^k inside u64
+    let k1 = k;
+    if k1 > 18 { k1 = 18; }
+    let p1: u64 = 1;
+    let j: i64 = 0;
+    while j < k1 { p1 = p1 * 10; j = j + 1; }
+    let r = muldiv(v, u64(1) << sh, p1);
+    let k2 = k - k1;
+    let p2: u64 = 1;
+    j = 0;
+    while j < k2 { p2 = p2 * 10; j = j + 1; }
+    return r / p2;
+}
+
+// "1e9", "4000000000", "15" -> integer
+fn parse_num(s: str) -> u64 {
+    let b = s.bytes;
+    let v: u64 = 0;
+    let i: u64 = 0;
+    while i < b.len && isdig(b[i]) { v = v * 10 + u64(b[i] - 48); i = i + 1; }
+    if i < b.len && b[i] == 46 {           // skip fraction for integer contexts
+        i = i + 1;
+        while i < b.len && isdig(b[i]) { i = i + 1; }
+    }
+    if i < b.len && (b[i] == 101 || b[i] == 69) {
+        i = i + 1;
+        let e: u64 = 0;
+        while i < b.len && isdig(b[i]) { e = e * 10 + u64(b[i] - 48); i = i + 1; }
+        let k: u64 = 0;
+        while k < e { v = v * 10; k = k + 1; }
+    }
+    return v;
+}
+
+fn arg_or(i: i64, dflt: str) -> str {
+    // (a match whose arms all `return` a str trips a codegen bug in ourc 0.2.0 -- see NOTES)
+    let r = dflt;
+    let a = process.arg(i);
+    match a {
+        Ok(x) => { r = x; }
+        Err(e) => {}
+    }
+    return r;
+}
+
+// ---------------------------------------------------------------- records table
+struct Rec { p: *u64, max: u64 }
+
+fn load_records(path: str) -> Rec {
+    let heap = system_allocator();
+    let data = fs.slurp(heap, path.bytes.ptr);
+    let rp = rt_alloc64(1);
+    let mx: u64 = 0;
+    if true {
+    let s = data.as_slice();
+    // pass 1: max gap
+    let i: u64 = 0;
+    while i < s.len {
+        let g: u64 = 0;
+        while i < s.len && isdig(s[i]) { g = g * 10 + u64(s[i] - 48); i = i + 1; }
+        if g > mx { mx = g; }
+        while i < s.len && s[i] != 10 { i = i + 1; }
+        i = i + 1;
+    }
+    rp = rt_alloc64(mx + 1);
+    let rec = slice(rp, mx + 1);
+    i = 0;
+    while i < s.len {
+        let g: u64 = 0;
+        while i < s.len && isdig(s[i]) { g = g * 10 + u64(s[i] - 48); i = i + 1; }
+        while i < s.len && s[i] == 32 { i = i + 1; }
+        let lo = i;
+        while i < s.len && s[i] != 10 && s[i] != 32 { i = i + 1; }
+        if g > 0 && g <= mx { rec[g] = parse_q32(s, lo, i); }
+        while i < s.len && s[i] != 10 { i = i + 1; }
+        i = i + 1;
+    }
+    }
+    data.destroy();
+    return Rec { p: rp, max: mx };
+}
+
+// ---------------------------------------------------------------- primes
+struct Primes { p: *u32, n: u64, lprod: u64 }       // lprod = prod (1 - 1/p), Q62
+
+fn sieve_primes(L: u64) -> Primes {
+    let r: u64 = 2;
+    while r * r <= L { r = r + 1; }
+    let sp = rt_alloc8(r + 1);
+    let small = slice(sp, r + 1);
+    let bp = rt_alloc32(r + 1);
+    let base = slice(bp, r + 1);
+    let nb: u64 = 0;
+    let i: u64 = 2;
+    while i <= r {
+        if small[i] == 0 {
+            base[nb] = u32(i); nb = nb + 1;
+            let j = i * i;
+            while j <= r { small[j] = 1; j = j + i; }
+        }
+        i = i + 1;
+    }
+    // capacity: pi(x) < 1.26 x / ln x; use x/ (ln x - 1.1) like the C version
+    let lnL = ln_q32(L) >> 32;
+    let cap = L / (lnL - 1) + 1000;
+    let pp = rt_alloc32(cap);
+    let out = slice(pp, cap);
+    let cnt: u64 = 0;
+    let SEG: u64 = 1 << 22;
+    let gp = rt_alloc8(SEG);
+    let seg = slice(gp, SEG);
+    let lo: u64 = 2;
+    let lprod = one62();
+    while lo <= L {
+        let hi = lo + SEG - 1;
+        if hi > L { hi = L; }
+        rt_zero(gp, SEG);
+        let k: u64 = 0;
+        while k < nb {
+            let p = u64(base[k]);
+            if p * p > hi { break; }
+            let st = (lo + p - 1) / p * p;
+            if st < p * p { st = p * p; }
+            while st <= hi { seg[st - lo] = 1; st = st + p; }
+            k = k + 1;
+        }
+        let j = lo;
+        while j <= hi {
+            if seg[j - lo] == 0 {
+                out[cnt] = u32(j); cnt = cnt + 1;
+                lprod = lprod - lprod / j;           // *= (1 - 1/p), exact to Q62 rounding
+            }
+            j = j + 1;
+        }
+        lo = hi + 1;
+    }
+    rt_free(sp); rt_free(bp); rt_free(gp);
+    return Primes { p: pp, n: cnt, lprod: lprod };
+}
+
+// ---------------------------------------------------------------- modular search
+// smallest x >= 0 with l <= (a*x) mod m <= r  (0 <= l <= r < m < 2^32). -1 if none.
+fn msearch(a0: u64, m: u64, l: u64, r: u64) -> i64 {
+    if l == 0 { return 0; }
+    let a = a0 % m;
+    if a == 0 { return -1; }
+    let k = (l + a - 1) / a;
+    if a * k <= r { return i64(k); }
+    let nl = (a - r % a) % a;
+    let nr = (a - l % a) % a;
+    let y: i64 = 0;
+    if nl <= nr { y = msearch(m % a, a, nl, nr); }
+    if y < 0 { return -1; }
+    while true {
+        let yy = u64(y);
+        let x = (m * yy + l + a - 1) / a;
+        if a * x <= m * yy + r { return i64(x); }
+        if yy > a { return -1; }
+        y = y + 1;
+    }
+    return -1;
+}
+
+// ---------------------------------------------------------------- the engine
+struct Ctx {
+    P: u64, d: u64, m0: u64, M: u64, SL: u64, L: u64,
+    lam: u64, mcal: u64, dry: bool,
+    K: *void, N: *void, T: *void,
+    lnK: u64,
+    pr: *u32, np: u64, lprod: u64, kr: *u32,
+    rec: *u64, recmax: u64,
+    // scratch
+    bits: *u64, words: u64, MB: u64,
+    R: *u32, Lf: *u32, cntL: *u32, pw: *u64, imp: *u8,
+    // stats
+    tprp: u64, prp_n: u64, prp_t: u64,
+    gpu: u64, nl: u64,
+    ncand: u64, ntested: u64, ncomplete: u64, nhits: u64,
+    sum_score: u64, value: u64, sum_pcal: u64, calhits: u64,   // sums in Q40
+    t_pre: u64, t_sieve: u64, t_score: u64, t_test: u64
+}
+
+fn gcd64(a0: u64, b0: u64) -> u64 {
+    let a = a0; let b = b0;
+    while b != 0 { let t = a % b; a = b; b = t; }
+    return a;
+}
+
+fn engine_setup(write c: Ctx, recpath: str) {
+    let t0 = rt_now_ns();
+    let rc = load_records(recpath);
+    c.rec = rc.p; c.recmax = rc.max;
+    let ps = sieve_primes(c.L);
+    c.pr = ps.p; c.np = ps.n; c.lprod = ps.lprod;
+    c.K = rt_mpz(); c.N = rt_mpz(); c.T = rt_mpz();
+    __gmpz_primorial_ui(c.K, c.P);
+    if __gmpz_divisible_ui_p(c.K, c.d) == 0 { io.eprintln("d must divide P#"); process.exit(1); }
+    __gmpz_divexact_ui(c.K, c.K, c.d);
+    // ln K = sum ln p (p <= P) - ln d
+    let pr = slice(c.pr, c.np);
+    let s: u64 = 0;
+    let i: u64 = 0;
+    while i < c.np && u64(pr[i]) <= c.P { s = s + ln_q32(u64(pr[i])); i = i + 1; }
+    c.lnK = s - ln_q32(c.d);
+    c.kr = rt_alloc32(c.np);
+    let kr = slice(c.kr, c.np);
+    i = 0;
+    while i < c.np { kr[i] = u32(__gmpz_fdiv_ui(c.K, u64(pr[i]))); i = i + 1; }
+    c.t_pre = rt_now_ns() - t0;
+    // PRP timing on numbers of this size with no small factor
+    let g = rt_mpz(); let sp = rt_mpz();
+    __gmpz_primorial_ui(sp, 2000);
+    __gmpz_mul_ui(c.T, c.K, c.m0);
+    __gmpz_add_ui(c.T, c.T, 1);
+    if rt_mpz_odd(c.T) == 0 { __gmpz_add_ui(c.T, c.T, 1); }
+    let done: u64 = 0;
+    let ta = rt_now_ns();
+    let guard: u64 = 0;
+    while done < 3 && guard < 100000 {
+        __gmpz_gcd(g, c.T, sp);
+        if __gmpz_cmp_ui(g, 1) == 0 { __gmpz_probab_prime_p(c.T, 1); done = done + 1; }
+        __gmpz_add_ui(c.T, c.T, 2);
+        guard = guard + 1;
+    }
+    c.tprp = (rt_now_ns() - ta) / 3;
+    rt_mpz_free(g); rt_mpz_free(sp);
+    // limb count for the gpu packing: room for K * (m0 + M) + SL
+    __gmpz_mul_ui(c.T, c.K, c.m0 + c.M + 1);
+    c.nl = u64(rt_mpz_bits(c.T)) / 32 + 1;
+    // scratch
+    c.words = (c.SL + 64) / 64 + 1;
+    let mb = 64000000 / (2 * c.words * 8);
+    if mb < 1 { mb = 1; }
+    if mb > c.M { mb = c.M; }
+    c.MB = mb;
+    c.bits = rt_alloc64(mb * 2 * c.words);
+    c.R = rt_alloc32(c.SL + 2);
+    c.Lf = rt_alloc32(c.SL + 2);
+    c.cntL = rt_alloc32(c.SL + 3);
+    c.pw = rt_alloc64(c.SL + 3);
+    c.imp = rt_alloc8(2 * c.SL + 4);
+}
+
+fn setbit(b: slice mut u64, i: u64) { b[i >> 6] = b[i >> 6] | (u64(1) << (i & 63)); }
+
+// strike every offset of every center in [mstart, mstart+mb) that has a prime factor <= L
+fn sieve_block(write c: Ctx, mstart: u64, mb: u64) {
+    let W = c.words;
+    rt_zero(c.bits, mb * 2 * W * 8);
+    let bits = slice(c.bits, mb * 2 * W);
+    let pr = slice(c.pr, c.np);
+    let kr = slice(c.kr, c.np);
+    let SL = c.SL;
+    let i: u64 = 0;
+    while i < c.np {
+        let p = u64(pr[i]);
+        let a = u64(kr[i]);
+        let hits_x = mb * (2 * SL + 1);               // hits ~ hits_x / p
+        if p <= 2 * SL + 1 || 3 * (hits_x / p + 1) >= mb {
+            let mr = mstart % p;
+            let k: u64 = 0;
+            while k < mb {
+                let r = (mr * a) % p;
+                let rt = k * 2 * W;
+                let lf = rt + W;
+                let s = (p - r) % p;
+                if s == 0 { s = p; }
+                while s <= SL { bits[rt + (s >> 6)] = bits[rt + (s >> 6)] | (u64(1) << (s & 63)); s = s + p; }
+                s = r;
+                if s == 0 { s = p; }
+                while s <= SL { bits[lf + (s >> 6)] = bits[lf + (s >> 6)] | (u64(1) << (s & 63)); s = s + p; }
+                mr = mr + 1;
+                if mr == p { mr = 0; }
+                k = k + 1;
+            }
+        } else {
+            let B = ((mstart % p) * a) % p;
+            let k: u64 = 0;
+            while k < mb {
+                let Bk = (B + a * k) % p;
+                let lo = (p - SL % p + p - Bk) % p;
+                let hi = (lo + 2 * SL) % p;
+                let x: i64 = 0;
+                if lo <= hi { x = msearch(a, p, lo, hi); } else {
+                    let x1 = msearch(a, p, lo, p - 1);
+                    let x2 = msearch(a, p, 0, hi);
+                    if x1 < 0 { x = x2; } else { if x2 < 0 { x = x1; } else { if x1 < x2 { x = x1; } else { x = x2; } } }
+                }
+                if x < 0 { break; }
+                k = k + u64(x);
+                if k >= mb { break; }
+                let r = (B + a * k) % p;
+                let rt = k * 2 * W;
+                let lf = rt + W;
+                if r == 0 {
+                    if p <= SL { bits[rt + (p >> 6)] = bits[rt + (p >> 6)] | (u64(1) << (p & 63)); bits[lf + (p >> 6)] = bits[lf + (p >> 6)] | (u64(1) << (p & 63)); }
+                } else {
+                    if r >= p - SL {
+                        let o = p - r;
+                        bits[rt + (o >> 6)] = bits[rt + (o >> 6)] | (u64(1) << (o & 63));
+                    } else {
+                        if r <= SL { bits[lf + (r >> 6)] = bits[lf + (r >> 6)] | (u64(1) << (r & 63)); }
+                    }
+                }
+                k = k + 1;
+            }
+        }
+        i = i + 1;
+    }
+}
+
+fn q40(v: u64) -> u64 { return v >> 22; }   // Q62 -> Q40 accumulator scale
+
+fn improves(rec: slice u64, recmax: u64, g: u64, lnN: u64) -> bool {
+    if g > recmax { return true; }
+    return g > mulhi(rec[g], lnN);            // g/lnN > rec  <=>  g > rec*lnN (both Q32 -> hi word)
+}
+
+fn merit_e4(g: u64, lnN: u64) -> u64 { return (muldiv(g * 20000, u64(1) << 32, lnN) + 1) / 2; }
+
+fn pmerit(write o: Out, m4: u64) {
+    pu(o, m4 / 10000); pb(o, 46);
+    let f = m4 % 10000;
+    if f < 1000 { pb(o, 48); } if f < 100 { pb(o, 48); } if f < 10 { pb(o, 48); }
+    pu(o, f);
+}
+
+fn prec4(write o: Out, rq32: u64) {                 // record merit (Q32) as %.4f
+    pfix(o, rq32 >> 2, 30, 4);
+}
+
+fn psec(write o: Out, ns: u64, nd: u64) {          // nanoseconds as seconds, nd decimals
+    let unit: u64 = 1000000000;
+    let k: u64 = 0;
+    let dv: u64 = 1;
+    while k < 9 - nd { dv = dv * 10; k = k + 1; }
+    let v = (ns + dv / 2) / dv;
+    let sc: u64 = 1;
+    k = 0;
+    while k < nd { sc = sc * 10; k = k + 1; }
+    pu(o, v / sc);
+    if nd > 0 {
+        pb(o, 46);
+        let f = v % sc;
+        let t = sc / 10;
+        while t > 1 && f < t { pb(o, 48); t = t / 10; }
+        pu(o, f);
+    }
+}
+
+
+// ---------------------------------------------------------------- one result line
+fn put_T(write o: Out, m: u64, lnN: u64, sc: u64, scb: u64, completed: bool, a: i64, b: i64, gap: u64,
+         m4: u64, rq: u64, tr: u64, tl: u64, pcal: u64, hitcal: u64, hit: u64, dt: u64,
+         scal0: u64, q: u64, vpol: u64, cpol_ns: u64) {
+    ps(o, "T\t"); pu(o, m); tab(o);
+    pu(o, lnN / 9889527665 + 1); tab(o);
+    psci(o, sc, 62, 4); tab(o); psci(o, scb, 62, 4); tab(o);
+    if completed { pb(o, 49); } else { pb(o, 48); }
+    tab(o);
+    pi(o, a); tab(o); pi(o, b); tab(o); pu(o, gap); tab(o);
+    pmerit(o, m4); tab(o); prec4(o, rq); tab(o);
+    pu(o, tr); tab(o); pu(o, tl); tab(o);
+    pfix(o, pcal >> 2, 60, 5); tab(o); pu(o, hitcal); tab(o); pu(o, hit); tab(o);
+    psec(o, dt, 3); tab(o); psci(o, scal0, 62, 6); tab(o); psci(o, q, 62, 6); tab(o);
+    psci(o, vpol, 62, 6); tab(o); psec(o, cpol_ns, 3);
+    pb(o, 10);
+    flush(o);
+}
+
+// ---------------------------------------------------------------- the wavefront (gpu) tester
+// candidates that pass the gate are parked in a group; the group is tested in rounds where every
+// active candidate contributes its next CH survivors, so one gpu dispatch carries ~G*CH numbers.
+struct Grp {
+    G: u64, CAPS: u64, n: u64, IMPN: u64, CH: u64,
+    m: *u64, lnN: *u64, q: *u64, Gc: *u64, eL: *u64, nR: *u64, nL: *u64,
+    st: *u64, idx: *u64, b: *u64, a: *u64, tr: *u64, tl: *u64, comp: *u64,
+    scb: *u64, pcal: *u64, sc: *u64, scal0: *u64, vpol: *u64, cpol: *u64, pwnL: *u64,
+    R: *u32, Lf: *u32, imp: *u8,
+    nums: *u32, rmods: *u32, res: *u8, own: *u64, cntk: *u64, BMAX: u64, t0: u64
+}
+
+fn grp_new(G: u64, SL: u64, nl: u64) -> Grp {
+    let caps = SL / 8 + 256;
+    let ch: u64 = 16;
+    let bmax = G * ch;
+    return Grp {
+        G: G, CAPS: caps, n: 0, IMPN: 2 * SL + 4, CH: ch,
+        m: rt_alloc64(G), lnN: rt_alloc64(G), q: rt_alloc64(G), Gc: rt_alloc64(G), eL: rt_alloc64(G),
+        nR: rt_alloc64(G), nL: rt_alloc64(G), st: rt_alloc64(G), idx: rt_alloc64(G), b: rt_alloc64(G),
+        a: rt_alloc64(G), tr: rt_alloc64(G), tl: rt_alloc64(G), comp: rt_alloc64(G),
+        scb: rt_alloc64(G), pcal: rt_alloc64(G), sc: rt_alloc64(G), scal0: rt_alloc64(G),
+        vpol: rt_alloc64(G), cpol: rt_alloc64(G), pwnL: rt_alloc64(G),
+        R: rt_alloc32(G * caps), Lf: rt_alloc32(G * caps), imp: rt_alloc8(G * (2 * SL + 4)),
+        nums: rt_alloc32(bmax * nl), rmods: rt_alloc32(bmax * nl), res: rt_alloc8(bmax),
+        own: rt_alloc64(bmax), cntk: rt_alloc64(G), BMAX: bmax, t0: 0
+    };
+}
+
+// side: 0 = right (N + off), 1 = left (N - off). returns true if a probable prime was confirmed.
+fn grp_finish_one(write c: Ctx, write g: Grp, write o: Out, i: u64, dt: u64) {
+    let gm = slice(g.m, g.G); let glnN = slice(g.lnN, g.G); let gq = slice(g.q, g.G);
+    let gb = slice(g.b, g.G); let ga = slice(g.a, g.G); let gtr = slice(g.tr, g.G); let gtl = slice(g.tl, g.G);
+    let gcomp = slice(g.comp, g.G); let gscb = slice(g.scb, g.G); let gpcal = slice(g.pcal, g.G);
+    let gsc = slice(g.sc, g.G); let gscal0 = slice(g.scal0, g.G); let gvpol = slice(g.vpol, g.G);
+    let gcpol = slice(g.cpol, g.G); let gGc = slice(g.Gc, g.G);
+    let rec = slice(c.rec, c.recmax + 1);
+    let imp = slice(g.imp, g.G * g.IMPN);
+    let completed = gcomp[i] == 1;
+    let gap: u64 = 0; let m4: u64 = 0; let rq: u64 = 0; let hitcal: u64 = 0; let hit: u64 = 0;
+    let av: i64 = -1; let bv: i64 = -1;
+    if gb[i] != 0 { bv = i64(gb[i]); }
+    if completed {
+        av = i64(ga[i]);
+        gap = ga[i] + gb[i];
+        m4 = merit_e4(gap, glnN[i]);
+        if gap <= c.recmax { rq = rec[gap]; }
+        if gap >= gGc[i] { hitcal = 1; }
+        c.ncomplete = c.ncomplete + 1;
+        c.value = c.value + q40(gscb[i]);
+        c.sum_pcal = c.sum_pcal + q40(gpcal[i]);
+        c.calhits = c.calhits + hitcal;
+        if imp[i * g.IMPN + gap] == 1 {
+            __gmpz_mul_ui(c.N, c.K, gm[i]);
+            __gmpz_add_ui(c.T, c.N, gb[i]);
+            let ok1 = __gmpz_probab_prime_p(c.T, 25);
+            __gmpz_sub_ui(c.T, c.N, ga[i]);
+            let ok2 = __gmpz_probab_prime_p(c.T, 25);
+            if ok1 != 0 && ok2 != 0 { hit = 1; c.nhits = c.nhits + 1; }
+        }
+    }
+    put_T(o, gm[i], glnN[i], gsc[i], gscb[i], completed, av, bv, gap, m4, rq, gtr[i], gtl[i],
+          gpcal[i], hitcal, hit, dt, gscal0[i], gq[i], gvpol[i], gcpol[i]);
+}
+
+fn grp_run(write c: Ctx, write g: Grp, write o: Out) {
+    if g.n == 0 { return; }
+    let t0 = rt_now_ns();
+    let n = g.n;
+    let G = g.G;
+    let gm = slice(g.m, G); let gq = slice(g.q, G); let geL = slice(g.eL, G);
+    let gnR = slice(g.nR, G); let gnL = slice(g.nL, G); let gst = slice(g.st, G); let gidx = slice(g.idx, G);
+    let gb = slice(g.b, G); let ga = slice(g.a, G); let gtr = slice(g.tr, G); let gtl = slice(g.tl, G);
+    let gcomp = slice(g.comp, G); let gscb = slice(g.scb, G); let gpcal = slice(g.pcal, G);
+    let gpw = slice(g.pwnL, G); let gGc = slice(g.Gc, G); let gcnt = slice(g.cntk, G);
+    let gR = slice(g.R, G * g.CAPS); let gL = slice(g.Lf, G * g.CAPS);
+    let imp = slice(g.imp, G * g.IMPN);
+    let nums = slice(g.nums, g.BMAX * c.nl);
+    let rmods = slice(g.rmods, g.BMAX * c.nl);
+    let res = slice(g.res, g.BMAX);
+    let ONE = one62();
+    let tests_total: u64 = 0;
+    let finished_at = rt_alloc64(G);
+    let fin = slice(finished_at, G);
+    let active = true;
+    while active {
+        // build one wavefront
+        let cnt: u64 = 0;
+        let i: u64 = 0;
+        while i < n {
+            gcnt[i] = 0;
+            if gst[i] == 0 || gst[i] == 1 {
+                let side = gst[i];
+                let lim = gnR[i];
+                if side == 1 { lim = gnL[i]; }
+                if lim > g.CAPS { lim = g.CAPS; }
+                if gidx[i] >= lim {
+                    gst[i] = 2;                            // exhausted the window without a prime
+                    fin[i] = rt_now_ns();
+                } else {
+                    __gmpz_mul_ui(c.N, c.K, gm[i]);
+                    let k: u64 = 0;
+                    while k < g.CH && gidx[i] + k < lim {
+                        let off: u64 = 0;
+                        if side == 0 { off = u64(gR[i * g.CAPS + gidx[i] + k]); __gmpz_add_ui(c.T, c.N, off); }
+                        else { off = u64(gL[i * g.CAPS + gidx[i] + k]); __gmpz_sub_ui(c.T, c.N, off); }
+                        rt_pack(c.T, &mut nums[cnt * c.nl], &mut rmods[cnt * c.nl], i32(c.nl));
+                        cnt = cnt + 1;
+                        k = k + 1;
+                    }
+                    gcnt[i] = k;
+                }
+            }
+            i = i + 1;
+        }
+        if cnt == 0 { active = false; break; }
+        if c.gpu == 2 { rt_cpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(c.nl), i32(cnt), &mut res[0]); }
+        else {
+            let used = rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(c.nl), i32(cnt), &mut res[0]);
+            if used < 0 {
+                // never trust a failed dispatch: a prime reported as composite would fake a longer gap.
+                // redo the batch with the exact cpu path and say so on stderr (the server ignores it)
+                io.eprintln("hunter: gpu dispatch failed, redoing this batch on the cpu");
+                rt_cpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(c.nl), i32(cnt), &mut res[0]);
+            }
+        }
+        tests_total = tests_total + cnt;
+        // read the wavefront back in the same order
+        let pos: u64 = 0;
+        i = 0;
+        while i < n {
+            let k = gcnt[i];
+            if k > 0 {
+                let side = gst[i];
+                let found = false;
+                let t: u64 = 0;
+                while t < k {
+                    if res[pos + t] == 1 {
+                        // base-2 fermat said prime: confirm with gmp (bpsw) like the cpu path
+                        let off: u64 = 0;
+                        __gmpz_mul_ui(c.N, c.K, gm[i]);
+                        if side == 0 { off = u64(gR[i * g.CAPS + gidx[i] + t]); __gmpz_add_ui(c.T, c.N, off); }
+                        else { off = u64(gL[i * g.CAPS + gidx[i] + t]); __gmpz_sub_ui(c.T, c.N, off); }
+                        if __gmpz_probab_prime_p(c.T, 1) != 0 {
+                            found = true;
+                            if side == 0 { gb[i] = off; gtr[i] = gidx[i] + t + 1; } else { ga[i] = off; gtl[i] = gidx[i] + t + 1; }
+                            break;
+                        }
+                    }
+                    t = t + 1;
+                }
+                if !found {
+                    gidx[i] = gidx[i] + k;
+                    if side == 0 { gtr[i] = gidx[i]; } else { gtl[i] = gidx[i]; }
+                } else {
+                    if side == 0 {
+                        // conditional score given the next prime, then the one-sided skip decision
+                        let b = gb[i];
+                        let omq = ONE - gq[i];
+                        let wl = gq[i];
+                        let tiny = ONE / 100000000000000;
+                        let scb: u64 = 0; let pcal: u64 = 0;
+                        let jq: u64 = 0;
+                        let lim = gnL[i];
+                        if lim > g.CAPS { lim = g.CAPS; }
+                        while jq < lim {
+                            if wl < tiny { break; }
+                            let gg = b + u64(gL[i * g.CAPS + jq]);
+                            if imp[i * g.IMPN + gg] == 1 { scb = scb + wl; }
+                            if gg >= gGc[i] { pcal = pcal + wl; }
+                            wl = mq(wl, omq);
+                            jq = jq + 1;
+                        }
+                        scb = scb + gpw[i];
+                        pcal = pcal + gpw[i];
+                        gscb[i] = scb; gpcal[i] = pcal;
+                        let tp = c.tprp;
+                        if c.prp_n > 40 { tp = c.prp_t / c.prp_n; }
+                        if scb >= mulsh(muldiv(c.lam, tp, 1000000000), geL[i], 32) {
+                            gst[i] = 1; gidx[i] = 0;
+                        } else {
+                            gst[i] = 2; fin[i] = rt_now_ns();
+                        }
+                    } else {
+                        gcomp[i] = 1; gst[i] = 2; fin[i] = rt_now_ns();
+                    }
+                }
+            }
+            pos = pos + k;
+            i = i + 1;
+        }
+    }
+    let wall = rt_now_ns() - t0;
+    c.prp_n = c.prp_n + tests_total;
+    c.prp_t = c.prp_t + wall;
+    c.t_test = c.t_test + wall;
+    let i2: u64 = 0;
+    while i2 < n {
+        let dt = wall / n;
+        grp_finish_one(c, g, o, i2, dt);
+        i2 = i2 + 1;
+    }
+    rt_free(finished_at);
+    g.n = 0;
+}
+
+// park a gated candidate in the group (copies its survivors and its improves-table)
+fn grp_add(write g: Grp, m: u64, lnN: u64, q: u64, Gc: u64, eL: u64, nR: u64, nL: u64, sc: u64, scal0: u64,
+           vpol: u64, cpol_ns: u64, pwnL: u64, R: slice u32, Lf: slice u32, imp: slice u8) {
+    let i = g.n;
+    let G = g.G;
+    slice(g.m, G)[i] = m; slice(g.lnN, G)[i] = lnN; slice(g.q, G)[i] = q; slice(g.Gc, G)[i] = Gc;
+    slice(g.eL, G)[i] = eL; slice(g.nR, G)[i] = nR; slice(g.nL, G)[i] = nL; slice(g.sc, G)[i] = sc;
+    slice(g.scal0, G)[i] = scal0; slice(g.vpol, G)[i] = vpol; slice(g.cpol, G)[i] = cpol_ns;
+    slice(g.pwnL, G)[i] = pwnL; slice(g.st, G)[i] = 0; slice(g.idx, G)[i] = 0; slice(g.b, G)[i] = 0;
+    slice(g.a, G)[i] = 0; slice(g.tr, G)[i] = 0; slice(g.tl, G)[i] = 0; slice(g.comp, G)[i] = 0;
+    slice(g.scb, G)[i] = 0; slice(g.pcal, G)[i] = 0;
+    let gR = slice(g.R, G * g.CAPS); let gL = slice(g.Lf, G * g.CAPS);
+    let k: u64 = 0;
+    let lr = nR; if lr > g.CAPS { lr = g.CAPS; }
+    while k < lr { gR[i * g.CAPS + k] = R[k]; k = k + 1; }
+    let ll = nL; if ll > g.CAPS { ll = g.CAPS; }
+    k = 0;
+    while k < ll { gL[i * g.CAPS + k] = Lf[k]; k = k + 1; }
+    let gi = slice(g.imp, G * g.IMPN);
+    memcpy(&mut gi[i * g.IMPN], &imp[0], g.IMPN);
+    g.n = i + 1;
+}
+
+fn run_engine(write c: Ctx, write o: Out) {
+    let t0 = rt_now_ns();
+    let rec = slice(c.rec, c.recmax + 1);
+    let R = slice(c.R, c.SL + 2);
+    let Lf = slice(c.Lf, c.SL + 2);
+    let cntL = slice(c.cntL, c.SL + 3);
+    let pw = slice(c.pw, c.SL + 3);
+    let imp = slice(c.imp, 2 * c.SL + 4);
+    let ONE = one62();
+    let SL = c.SL;
+    let G: u64 = 1;
+    if c.gpu == 2 { G = 64; }      // cpu reference wavefront (validation)
+    if c.gpu == 1 { G = 256; }     // metal: 256 centers x 16 survivors = 4096 tests per dispatch fills an M-series gpu
+    let grp = grp_new(G, c.SL, c.nl + 1);
+    let b0: u64 = 0;
+    while b0 < c.M {
+        let mb = c.M - b0;
+        if mb > c.MB { mb = c.MB; }
+        let mstart = c.m0 + b0;
+        let ts = rt_now_ns();
+        sieve_block(c, mstart, mb);
+        c.t_sieve = c.t_sieve + (rt_now_ns() - ts);
+        let bits = slice(c.bits, mb * 2 * c.words);
+        let k: u64 = 0;
+        while k < mb {
+            let m = mstart + k;
+            if gcd64(m, c.d) != 1 { k = k + 1; continue; }
+            c.ncand = c.ncand + 1;
+            let t1 = rt_now_ns();
+            let rt = k * 2 * c.words;
+            let lf = rt + c.words;
+            let nR: u64 = 0;
+            let nL: u64 = 0;
+            let off: u64 = 1;
+            while off <= SL {
+                if ((bits[rt + (off >> 6)] >> (off & 63)) & 1) == 0 { R[nR] = u32(off); nR = nR + 1; }
+                if ((bits[lf + (off >> 6)] >> (off & 63)) & 1) == 0 { Lf[nL] = u32(off); nL = nL + 1; }
+                off = off + 1;
+            }
+            let lnN = c.lnK + ln_q32(m);
+            let D = mulsh(lnN, c.lprod, 62);              // lnN * prod, Q32
+            let q = divpow2(94, D);                       // 1 / (lnN * prod), Q62
+            let omq = ONE - q;
+            let nmax = nR;
+            if nL > nmax { nmax = nL; }
+            pw[0] = ONE;
+            let j: u64 = 1;
+            while j <= nmax { pw[j] = mq(pw[j - 1], omq); j = j + 1; }
+            // which gap sizes would beat the table at this ln N
+            let G0: u64 = 0;
+            let g: u64 = 0;
+            while g <= 2 * SL + 1 {
+                if improves(rec, c.recmax, g, lnN) { imp[g] = 1; if G0 == 0 && g >= 2 && (g & 1) == 0 { G0 = g; } } else { imp[g] = 0; }
+                g = g + 1;
+            }
+            if G0 == 0 { G0 = 2 * SL; }
+            // cntL[x] = #left survivors with offset < x
+            let jj: u64 = 0;
+            let x: u64 = 0;
+            while x <= SL + 1 {
+                while jj < nL && u64(Lf[jj]) < x { jj = jj + 1; }
+                cntL[x] = u32(jj);
+                x = x + 1;
+            }
+            // s0 = P(gap >= G0), the cheap upper bound
+            let s0: u64 = 0;
+            let w = q;
+            let i: u64 = 0;
+            while i < nR {
+                let need = i64(G0) - i64(R[i]);
+                let tail = ONE;
+                if need > 1 { if u64(need) > SL + 1 { tail = pw[nL]; } else { tail = pw[cntL[u64(need)]]; } }
+                s0 = s0 + mq(w, tail);
+                w = mq(w, omq);
+                if w == 0 { break; }
+                i = i + 1;
+            }
+            // pre-test P(merit >= mcal)
+            let Gc = mulhi(c.mcal, lnN) + 1;              // ceil(mcal * lnN)
+            let scal0: u64 = 0;
+            w = q;
+            i = 0;
+            while i < nR {
+                let need = i64(Gc) - i64(R[i]);
+                let tail = ONE;
+                if need > 1 { if u64(need) > SL + 1 { tail = pw[nL]; } else { tail = pw[cntL[u64(need)]]; } }
+                scal0 = scal0 + mq(w, tail);
+                w = mq(w, omq);
+                if w == 0 { break; }
+                i = i + 1;
+            }
+            let qs = q >> 32;
+            let eR = (ONE - pw[nR]) / qs;                 // expected PRP tests, Q32
+            let eL = (ONE - pw[nL]) / qs;
+            let tp = c.tprp;
+            if c.prp_n > 40 { tp = c.prp_t / c.prp_n; }
+            let lamt = muldiv(c.lam, tp, 1000000000);    // improvements per test, Q62
+            let sc: u64 = 0;
+            let vpol: u64 = 0;
+            let pcont: u64 = 0;
+            if c.dry || s0 >= mulsh(lamt, eR, 32) {
+                let wr = q;
+                let lthr = mulsh(lamt, eL, 32);
+                let cut_r = s0 / 1000000000;
+                let cut_p = s0 / 1000000000000;
+                i = 0;
+                while i < nR {
+                    if wr < cut_r { break; }
+                    let need = i64(G0) - i64(R[i]);
+                    let j0: u64 = 0;
+                    if need > 1 { if u64(need) > SL + 1 { j0 = nL; } else { j0 = u64(cntL[u64(need)]); } }
+                    let wl = mq(q, pw[j0]);
+                    let inner: u64 = 0;
+                    let jx = j0;
+                    let ri = u64(R[i]);
+                    while jx < nL {
+                        if mq(wr, wl) < cut_p { break; }
+                        if imp[ri + u64(Lf[jx])] == 1 { inner = inner + wl; }
+                        wl = mq(wl, omq);
+                        jx = jx + 1;
+                    }
+                    inner = inner + pw[nL];
+                    let contrib = mq(wr, inner);
+                    sc = sc + contrib;
+                    if inner >= lthr { vpol = vpol + contrib; pcont = pcont + wr; }
+                    wr = mq(wr, omq);
+                    i = i + 1;
+                }
+            }
+            let cpol = eR + mulsh(pcont, eL, 62);         // expected tests under the policy, Q32
+            c.sum_score = c.sum_score + q40(sc);
+            c.t_score = c.t_score + (rt_now_ns() - t1);
+            if c.dry {
+                ps(o, "S\t"); pu(o, m); tab(o);
+                psci(o, sc, 62, 6); tab(o); psci(o, s0, 62, 6); tab(o);
+                psec(o, mulsh(cpol, tp, 32), 4); tab(o);
+                pu(o, nR); tab(o); pu(o, nL); tab(o);
+                psci(o, vpol, 62, 6); tab(o); pfix(o, pcont >> 2, 60, 4); tab(o); psci(o, q, 62, 6);
+                pb(o, 10);
+                k = k + 1;
+                continue;
+            }
+            if vpol == 0 || vpol < mulsh(lamt, cpol, 32) { k = k + 1; continue; }
+            if c.gpu != 0 {
+                c.ntested = c.ntested + 1;
+                grp_add(grp, m, lnN, q, Gc, eL, nR, nL, sc, scal0, vpol, mulsh(cpol, tp, 32), pw[nL],
+                        &R[0..c.SL + 2], &Lf[0..c.SL + 2], &imp[0..2 * c.SL + 4]);
+                if grp.n == grp.G { grp_run(c, grp, o); }
+                k = k + 1;
+                continue;
+            }
+
+            // ---- stage 2: next prime; stage 3: previous prime if still worth it
+            let t2 = rt_now_ns();
+            c.ntested = c.ntested + 1;
+            __gmpz_mul_ui(c.N, c.K, m);
+            let bnext: i64 = -1;
+            let aprev: i64 = -1;
+            let tr: u64 = 0;
+            let tl: u64 = 0;
+            i = 0;
+            while i < nR {
+                __gmpz_add_ui(c.T, c.N, u64(R[i]));
+                tr = tr + 1;
+                if __gmpz_probab_prime_p(c.T, 1) != 0 { bnext = i64(R[i]); break; }
+                i = i + 1;
+            }
+            let scb: u64 = 0;
+            let pcal: u64 = 0;
+            let completed = false;
+            if bnext >= 0 {
+                let b = u64(bnext);
+                let wl = q;
+                let tiny = ONE / 100000000000000;
+                let jq: u64 = 0;
+                while jq < nL {
+                    if wl < tiny { break; }
+                    let gg = b + u64(Lf[jq]);
+                    if imp[gg] == 1 { scb = scb + wl; }
+                    if gg >= Gc { pcal = pcal + wl; }
+                    wl = mq(wl, omq);
+                    jq = jq + 1;
+                }
+                scb = scb + pw[nL];
+                pcal = pcal + pw[nL];
+                let tpn = tp;
+                if c.prp_n > 40 { tpn = c.prp_t / c.prp_n; }
+                if scb >= mulsh(muldiv(c.lam, tpn, 1000000000), eL, 32) {
+                    jq = 0;
+                    while jq < nL {
+                        __gmpz_sub_ui(c.T, c.N, u64(Lf[jq]));
+                        tl = tl + 1;
+                        if __gmpz_probab_prime_p(c.T, 1) != 0 { aprev = i64(Lf[jq]); break; }
+                        jq = jq + 1;
+                    }
+                    if aprev >= 0 { completed = true; }
+                }
+            }
+            let dt = rt_now_ns() - t2;
+            c.t_test = c.t_test + dt;
+            c.prp_n = c.prp_n + tr + tl;
+            c.prp_t = c.prp_t + dt;
+            let gap: u64 = 0;
+            let m4: u64 = 0;
+            let rq: u64 = 0;
+            let hitcal: u64 = 0;
+            let hit: u64 = 0;
+            if completed {
+                gap = u64(aprev) + u64(bnext);
+                m4 = merit_e4(gap, lnN);
+                if gap <= c.recmax { rq = rec[gap]; }
+                if gap >= Gc { hitcal = 1; }
+                c.ncomplete = c.ncomplete + 1;
+                c.value = c.value + q40(scb);
+                c.sum_pcal = c.sum_pcal + q40(pcal);
+                c.calhits = c.calhits + hitcal;
+                if imp[gap] == 1 {
+                    __gmpz_add_ui(c.T, c.N, u64(bnext));
+                    let ok1 = __gmpz_probab_prime_p(c.T, 25);
+                    __gmpz_sub_ui(c.T, c.N, u64(aprev));
+                    let ok2 = __gmpz_probab_prime_p(c.T, 25);
+                    if ok1 != 0 && ok2 != 0 { hit = 1; c.nhits = c.nhits + 1; }
+                }
+            }
+            // T  m digits sc scb completed a b gap merit rec tr tl pcal hitcal hit dt scal0 q vpol cpol
+            ps(o, "T\t"); pu(o, m); tab(o);
+            pu(o, lnN / 9889527665 + 1); tab(o);
+            psci(o, sc, 62, 4); tab(o); psci(o, scb, 62, 4); tab(o);
+            if completed { pb(o, 49); } else { pb(o, 48); } tab(o);
+            pi(o, aprev); tab(o); pi(o, bnext); tab(o); pu(o, gap); tab(o);
+            pmerit(o, m4); tab(o); prec4(o, rq); tab(o);
+            pu(o, tr); tab(o); pu(o, tl); tab(o);
+            pfix(o, pcal >> 2, 60, 5); tab(o); pu(o, hitcal); tab(o); pu(o, hit); tab(o);
+            psec(o, dt, 3); tab(o); psci(o, scal0, 62, 6); tab(o); psci(o, q, 62, 6); tab(o);
+            psci(o, vpol, 62, 6); tab(o); psec(o, mulsh(cpol, tp, 32), 3);
+            pb(o, 10);
+            flush(o);
+            k = k + 1;
+        }
+        b0 = b0 + mb;
+    }
+    if c.gpu != 0 { grp_run(c, grp, o); }
+    let tt = rt_now_ns() - t0 + c.t_pre;
+    // summary line (same keys as the C engine)
+    ps(o, "#\tP="); pu(o, c.P); ps(o, "\td="); pu(o, c.d); ps(o, "\tm0="); pu(o, c.m0);
+    ps(o, "\tM="); pu(o, c.M); ps(o, "\tSL="); pu(o, c.SL); ps(o, "\tL="); pu(o, c.L);
+    ps(o, "\tlambda="); psci(o, c.lam >> 2, 60, 4);
+    ps(o, "\tcand="); pu(o, c.ncand); ps(o, "\ttested="); pu(o, c.ntested); ps(o, "\tcompleted="); pu(o, c.ncomplete);
+    ps(o, "\tsum_score="); psci(o, c.sum_score, 40, 6);
+    ps(o, "\tvalue="); psci(o, c.value, 40, 6);
+    ps(o, "\tpcal="); pfix(o, c.sum_pcal, 40, 4);
+    ps(o, "\tcalhits="); pu(o, c.calhits); ps(o, "\thits="); pu(o, c.nhits);
+    ps(o, "\tt_prp="); psec(o, c.tprp, 5);
+    ps(o, "\tprp_mean="); if c.prp_n > 0 { psec(o, c.prp_t / c.prp_n, 5); } else { ps(o, "0.00000"); }
+    ps(o, "\tpre_s="); psec(o, c.t_pre, 2); ps(o, "\tsieve_s="); psec(o, c.t_sieve, 2);
+    ps(o, "\tscore_s="); psec(o, c.t_score, 2); ps(o, "\ttest_s="); psec(o, c.t_test, 2);
+    ps(o, "\ttotal_s="); psec(o, tt, 2); ps(o, "\tcpu_s="); psec(o, rt_cpu_ns(), 2);
+    ps(o, "\tengine=praetor"); if c.gpu == 1 { ps(o, "+metal"); } if c.gpu == 2 { ps(o, "+wavefront-ref"); }
+    pb(o, 10);
+    flush(o);
+}
+
+fn new_ctx() -> Ctx {
+    let z: *void = rt_mpz();
+    let c = Ctx {
+        P: 0, d: 1, m0: 1, M: 1, SL: 1, L: 1, lam: 0, mcal: 0, dry: false,
+        K: z, N: z, T: z, lnK: 0,
+        pr: rt_alloc32(1), np: 0, lprod: 0, kr: rt_alloc32(1),
+        rec: rt_alloc64(1), recmax: 0,
+        bits: rt_alloc64(1), words: 1, MB: 1,
+        R: rt_alloc32(1), Lf: rt_alloc32(1), cntL: rt_alloc32(1), pw: rt_alloc64(1), imp: rt_alloc8(1),
+        tprp: 0, prp_n: 0, prp_t: 0,
+        gpu: 0, nl: 0,
+        ncand: 0, ntested: 0, ncomplete: 0, nhits: 0,
+        sum_score: 0, value: 0, sum_pcal: 0, calhits: 0,
+        t_pre: 0, t_sieve: 0, t_score: 0, t_test: 0
+    };
+    return c;
+}
+
+
+// ---------------------------------------------------------------- bench: cpu vs gpu prime tests
+fn cmd_bench() -> i32 {
+    let P = parse_num(arg_or(2, "4001"));
+    let d = parse_num(arg_or(3, "210"));
+    let count = parse_num(arg_or(4, "4096"));
+    let o = out_new(1, 1 << 14);
+    let K = rt_mpz(); let N = rt_mpz(); let T = rt_mpz(); let g = rt_mpz(); let sp = rt_mpz();
+    __gmpz_primorial_ui(K, P);
+    __gmpz_divexact_ui(K, K, d);
+    let m: u64 = 1000003;
+    while gcd64(m, d) != 1 { m = m + 2; }
+    __gmpz_mul_ui(N, K, m);
+    __gmpz_primorial_ui(sp, 3000);
+    let nl = u64(rt_mpz_bits(N)) / 32 + 2;
+    let digits = __gmpz_sizeinbase(N, 10);
+    let offs = slice(rt_alloc64(count), count);
+    let nums = slice(rt_alloc32(count * nl), count * nl);
+    let rmods = slice(rt_alloc32(count * nl), count * nl);
+    let res = slice(rt_alloc8(count), count);
+    let ref = slice(rt_alloc8(count), count);
+    let gmpr = slice(rt_alloc8(count), count);
+    let got: u64 = 0;
+    let off: u64 = 2;          // N is odd, so even offsets give odd candidates
+    while got < count {
+        __gmpz_add_ui(T, N, off);
+        __gmpz_gcd(g, T, sp);
+        if __gmpz_cmp_ui(g, 1) == 0 {
+            offs[got] = off;
+            rt_pack(T, &mut nums[got * nl], &mut rmods[got * nl], i32(nl));
+            got = got + 1;
+        }
+        off = off + 2;
+    }
+    ps(o, "hunter bench -- P="); pu(o, P); ps(o, " d="); pu(o, d); ps(o, "  ("); pu(o, digits);
+    ps(o, " digits, "); pu(o, nl); ps(o, " limbs), "); pu(o, count); ps(o, " survivor-like numbers\n");
+    // cpu: gmp, single thread
+    let ncpu = u64(rt_ncpu());
+    let t0 = rt_now_ns();
+    let nc = count;
+    if nc > 256 { nc = 256; }       // gmp times (and labels) the first 256; the gpu runs the whole batch
+    let i: u64 = 0;
+    let primes: u64 = 0;
+    let first_prime = count;
+    while i < nc {
+        __gmpz_add_ui(T, N, offs[i]);
+        let r = __gmpz_probab_prime_p(T, 1);
+        if r != 0 { gmpr[i] = 1; primes = primes + 1; if first_prime == count { first_prime = i; } } else { gmpr[i] = 0; }
+        i = i + 1;
+    }
+    t0 = rt_now_ns() - t0;
+    // the math check must include a prime: keep labelling until one shows up
+    let known = nc;
+    while first_prime == count && known < count {
+        __gmpz_add_ui(T, N, offs[known]);
+        if __gmpz_probab_prime_p(T, 1) != 0 { gmpr[known] = 1; primes = primes + 1; first_prime = known; } else { gmpr[known] = 0; }
+        known = known + 1;
+    }
+    if first_prime < count && first_prime > 0 {
+        // move it to slot 0 so the 16-number reference check sees it
+        let w: u64 = 0;
+        while w < nl {
+            let a = nums[w]; nums[w] = nums[first_prime * nl + w]; nums[first_prime * nl + w] = a;
+            let b = rmods[w]; rmods[w] = rmods[first_prime * nl + w]; rmods[first_prime * nl + w] = b;
+            w = w + 1;
+        }
+        let o0 = offs[0]; offs[0] = offs[first_prime]; offs[first_prime] = o0;
+        let g0 = gmpr[0]; gmpr[0] = gmpr[first_prime]; gmpr[first_prime] = g0;
+    }
+    let cpu_ns = t0 / nc;
+    ps(o, "  cpu  (gmp, 1 core)      "); psec(o, cpu_ns * 1000, 3); ps(o, " ms/test  =  ");
+    pu(o, 1000000000 / cpu_ns); ps(o, " tests/s per core, ~"); pu(o, ncpu * 1000000000 / cpu_ns);
+    ps(o, " tests/s on all "); pu(o, ncpu); ps(o, " cores\n");
+    flush(o);
+    // reference montgomery (the exact algorithm the gpu runs), a slice of the batch
+    let nr = count;
+    if nr > 16 { nr = 16; }
+    let t1 = rt_now_ns();
+    rt_cpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(nr), &mut ref[0]);
+    let ref_ns = (rt_now_ns() - t1) / nr;
+    let bad_ref: u64 = 0;
+    i = 0;
+    while i < nr { if ref[i] != gmpr[i] { bad_ref = bad_ref + 1; } i = i + 1; }
+    ps(o, "  cpu  (montgomery ref)   "); psec(o, ref_ns * 1000, 3); ps(o, " ms/test  (math check vs gmp: ");
+    pu(o, bad_ref); ps(o, " mismatches of "); pu(o, nr); ps(o, ")\n");
+    flush(o);
+    if rt_gpu_available() == 1 {
+        let gn = rt_gpu_name();
+        ps(o, "  gpu: ");
+        let gs = slice(gn, rt_strlen(gn));
+        let q: u64 = 0;
+        while q < gs.len { pb(o, gs[q]); q = q + 1; }
+        pb(o, 10);
+        flush(o);
+        let mode: i32 = 1;
+        while mode <= 2 {
+            rt_gpu_set_mode(mode);
+            let w = count;
+            if w > 64 { w = 64; }
+            rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(w), &mut res[0]);   // warm-up
+            let t2 = rt_now_ns();
+            let used = rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(count), &mut res[0]);
+            let gpu_ns = (rt_now_ns() - t2) / count;
+            let bad: u64 = 0;
+            i = 0;
+            while i < known { if res[i] != gmpr[i] { bad = bad + 1; } i = i + 1; }
+            if mode == 1 { ps(o, "  gpu  (device scratch)   "); } else { ps(o, "  gpu  (on-chip scratch)  "); }
+            if used < 0 { ps(o, "failed\n"); } else {
+                psec(o, gpu_ns * 1000, 3); ps(o, " ms/test  =  "); pu(o, 1000000000 / (gpu_ns + 1));
+                ps(o, " tests/s   ("); pu(o, bad); ps(o, " mismatches vs gmp of "); pu(o, known); ps(o, ")   = ");
+                pfix(o, muldiv(1000000000 / (gpu_ns + 1), u64(1) << 20, ncpu * 1000000000 / cpu_ns), 20, 2);
+                ps(o, "x all cpu cores\n");
+            }
+            flush(o);
+            mode = mode + 1;
+        }
+        rt_gpu_set_mode(0);
+    } else {
+        let ge = rt_gpu_error();
+        let gl = rt_strlen(ge);
+        if gl > 0 {
+            ps(o, "  gpu  not available: ");
+            let gs2 = slice(ge, gl);
+            pbs(o, gs2, 0, gl);
+            ps(o, "\n  (the hunter still runs fine on the cpu cores; send this line to claude)\n");
+        } else {
+            ps(o, "  gpu  not available on this machine (metal is macos-only)\n");
+        }
+    }
+    ps(o, "  primes among the gmp-labelled numbers: "); pu(o, primes); pb(o, 10);
+    flush(o);
+    return 0;
+}
+
+fn file_size_of(p: str) -> i64 { return rt_file_size(p.bytes.ptr); }
+
+fn cmd_hunt() -> i32 {
+    if process.argc() < 11 {
+        io.eprintln("usage: hunter hunt P d m0 M SL L lambda mcal records.txt");
+        return 1;
+    }
+    let c = new_ctx();
+    c.P = parse_num(arg_or(2, "0"));
+    c.d = parse_num(arg_or(3, "1"));
+    c.m0 = parse_num(arg_or(4, "1"));
+    c.M = parse_num(arg_or(5, "1"));
+    c.SL = parse_num(arg_or(6, "1"));
+    c.L = parse_num(arg_or(7, "1"));
+    c.lam = parse_sci_q62(arg_or(8, "0"));
+    let mc = arg_or(9, "0");
+    c.mcal = parse_q32(mc.bytes, 0, mc.len);
+    let gv = process.env("HUNTER_GPU");
+    c.gpu = 0;
+    match gv {
+        Ok(v) => { if v == "ref" { c.gpu = 2; } else { if v == "1" { if rt_gpu_available() == 1 { c.gpu = 1; } } } }
+        Err(e) => {}
+    }
+    let dr = process.env("HUNT_DRY");
+    match dr {
+        Ok(v) => { c.dry = true; }
+        Err(e) => { c.dry = false; }
+    }
+    let rp = arg_or(10, "records.txt");
+    let rs = file_size_of(rp);
+    if rs < 1000000 {
+        // with no table every gap would look like a record. refuse instead of lying.
+        io.eprintln("hunter hunt: records.txt is missing or truncated -- refusing to hunt without the record table");
+        return 2;
+    }
+    engine_setup(c, rp);
+    if c.recmax < 100000 {
+        io.eprintln("hunter hunt: the record table covers too few gap sizes -- refusing to hunt");
+        return 2;
+    }
+    let o = out_new(1, 1 << 16);
+    run_engine(c, o);
+    return 0;
+}
+
+
+// ================================================================ hunter serve: the control room
+//
+// one program: the http dashboard, the learner, and the scheduler. every core runs `hunter hunt`
+// as a child process (true parallelism + crash isolation); their output is parsed live here.
+// everything durable is a plain file next to the binary:
+//   state.tsv     learner state (raw fixed-point integers)
+//   gaps.tsv      every tested center, one line each (same columns as the python v3 hunter)
+//   FOUND.tsv     records, the moment they are found        VERIFIED.tsv  independent gmp checks
+//   jobs.tsv      one line per finished job                  hunt.log      human-readable log
+// the dashboard (ui.html) polls /api/status and pulls the raw files; it does its statistics in js.
+
+extern fn rt_server_init();
+extern fn rt_quit_requested() -> i32;
+extern fn rt_is_darwin() -> i32;
+extern fn rt_getpid() -> i64;
+extern fn rt_chdir_exe() -> i32;
+extern fn rt_accept_ms(fd: i64, ms: i32) -> i64;
+extern fn rt_recv_ms(fd: i64, buf: *u8, n: u64, ms: i32) -> i64;
+extern fn rt_send_all(fd: i64, buf: *const u8, n: u64) -> i64;
+extern fn rt_close_fd(fd: i64);
+extern fn rt_cloexec(fd: i64);
+extern fn rt_spawn(argz: *const u8, nargs: i32, me: i32, envz: *const u8, nenv: i32, out: *const u8) -> i64;
+extern fn rt_reap(pid: i64) -> i32;
+extern fn rt_kill(pid: i64, sig: i32);
+extern fn rt_open_r(path: *const u8) -> i64;
+extern fn rt_read_fd(fd: i64, buf: *u8, n: u64) -> i64;
+extern fn rt_file_size(path: *const u8) -> i64;
+extern fn rt_read_at(path: *const u8, off: u64, buf: *u8, n: u64) -> i64;
+extern fn rt_append(path: *const u8, buf: *const u8, n: u64) -> i32;
+extern fn rt_write_atomic(path: *const u8, buf: *const u8, n: u64) -> i32;
+extern fn rt_rename(a: *const u8, b: *const u8) -> i32;
+extern fn rt_mkdir(p: *const u8) -> i32;
+extern fn rt_date(buf: *u8) -> u64;
+extern fn rt_sleep_ms(ms: i32);
+extern fn __gmpz_nextprime(r: *void, a: *void);
+extern fn __gmpz_cmp(a: *void, b: *void) -> i32;
+extern fn __gmpz_set(r: *void, a: *void);
+
+// ---------------------------------------------------------------- byte-string helpers
+fn bz(write o: Out) { o.len = 0; }
+fn bcz(write o: Out, t: str) { o.len = 0; ps(o, t); pb(o, 0); }     // literal -> C string in o
+fn bend(write o: Out) { pb(o, 0); o.len = o.len - 1; }               // NUL-terminate, keep length
+fn pbs(write o: Out, s: slice u8, lo: u64, hi: u64) {
+    let i = lo;
+    while i < hi { pb(o, s[i]); i = i + 1; }
+}
+fn starts(s: slice u8, n: u64, at: u64, t: str) -> bool {
+    if at + t.len > n { return false; }
+    let i: u64 = 0;
+    while i < t.len { if s[at + i] != t.bytes[i] { return false; } i = i + 1; }
+    return true;
+}
+fn eqs(s: slice u8, lo: u64, hi: u64, t: str) -> bool {
+    if hi - lo != t.len { return false; }
+    return starts(s, hi, lo, t);
+}
+fn num_at(s: slice u8, lo: u64, hi: u64) -> u64 {
+    let v: u64 = 0;
+    let i = lo;
+    while i < hi && isdig(s[i]) { v = v * 10 + u64(s[i] - 48); i = i + 1; }
+    return v;
+}
+
+fn skip_digits(s: slice u8, at: u64) -> u64 {
+    let i = at;
+    while i < s.len && isdig(s[i]) { i = i + 1; }
+    return i;
+}
+
+// tab-separated field k of s[0..n] -> [lo, hi)
+struct Span { lo: u64, hi: u64 }
+fn fld(s: slice u8, n: u64, k: u64) -> Span {
+    let i: u64 = 0;
+    let f: u64 = 0;
+    while i < n && f < k { if s[i] == 9 { f = f + 1; } i = i + 1; }
+    let lo = i;
+    while i < n && s[i] != 9 && s[i] != 10 { i = i + 1; }
+    if f < k { return Span { lo: n, hi: n }; }
+    return Span { lo: lo, hi: i };
+}
+// value of "key=" in a tab- or &-separated line -> [lo, hi), lo == hi if missing
+fn kv(s: slice u8, n: u64, key: str) -> Span {
+    let i: u64 = 0;
+    while i < n {
+        if (i == 0 || s[i - 1] == 9 || s[i - 1] == 38) && starts(s, n, i, key) && i + key.len < n && s[i + key.len] == 61 {
+            let lo = i + key.len + 1;
+            let j = lo;
+            while j < n && s[j] != 9 && s[j] != 38 && s[j] != 10 && s[j] != 13 { j = j + 1; }
+            return Span { lo: lo, hi: j };
+        }
+        i = i + 1;
+    }
+    return Span { lo: 0, hi: 0 };
+}
+
+// ---------------------------------------------------------------- fixed-point learner math
+// rates are expected records per core-hour in Q40; logs are natural logs in signed Q32.
+fn LN2_32() -> i64 { return 2977044472; }
+fn isqrt(x: u64) -> u64 {
+    if x == 0 { return 0; }
+    let r: u64 = 0;
+    let bit: u64 = u64(1) << 62;
+    let v = x;
+    while bit > v { bit = bit >> 2; }
+    while bit != 0 {
+        if v >= r + bit { v = v - r - bit; r = (r >> 1) + bit; } else { r = r >> 1; }
+        bit = bit >> 2;
+    }
+    return r;
+}
+fn sabs(x: i64) -> u64 { if x < 0 { return u64(0) - u64(x); } return u64(x); }
+fn sgn(neg: bool, v: u64) -> i64 { if neg { return 0 - i64(v); } return i64(v); }
+fn smul32(a: i64, b: u64) -> i64 { return sgn(a < 0, mulsh(sabs(a), b, 32)); }        // a * b, b in Q32
+fn sdiv32(a: i64, b: u64) -> i64 { return sgn(a < 0, muldiv(sabs(a), u64(1) << 32, b)); } // a / b, b in Q32
+fn ln_rate(r: u64) -> i64 {                       // ln(Q40 value) in Q32
+    if r == 0 { return 0 - 296685830120; }        // ln(1e-30), like the python learner's clamp
+    return i64(ln_q32(r)) - 40 * LN2_32();
+}
+fn exp_q(x: i64, f: u64) -> u64 {                 // e^x (x in Q32) as Q(f), saturating
+    let y = smul32(x, 6196328019);                // x * log2(e)
+    let k: i64 = 0;                               // floor(y / 2^32)
+    if y >= 0 { k = y / 4294967296; } else { k = 0 - i64((sabs(y) + 4294967295) / 4294967296); }
+    let fr = u64(y - k * 4294967296);             // [0, 2^32)
+    let ln2: u64 = 3196577161300663914;
+    let t = mulsh(fr, ln2, 32);                   // fr * ln2, Q62
+    let sum: u64 = u64(1) << 62;
+    let term: u64 = u64(1) << 62;
+    let n: u64 = 1;
+    while n < 24 { term = mq(term, t) / n; sum = sum + term; n = n + 1; }
+    let sh: i64 = 62 - i64(f) - k;                // value = sum * 2^k / 2^62, wanted in Q(f)
+    if sh >= 63 { return 0; }
+    if sh <= 0 {
+        if 0 - sh >= 1 { return u64(0) - 1; }
+        return sum;
+    }
+    return sum >> u64(sh);
+}
+fn rng(write s: Srv) -> u64 {
+    let x = s.rng;
+    x = x ^ (x >> 12); x = x ^ (x << 25); x = x ^ (x >> 27);
+    s.rng = x;
+    return x * 2685821657736338717;
+}
+
+// ---------------------------------------------------------------- server state
+// arm record (72 u64 fields):
+//   0 P  1 d  2 lnK(Q32)  3 next_m  4 prior(Q40/core-h)  5 value(Q40)  6 cpu ns  7 jobs  8 tested
+//   9 completed  10 hits  11 candidates  12 predicted-calibration(Q40)  13 calibration hits
+//   14 ns per m  15 priced (0 no, 1 pricing, 2 yes)  16 in current set  17 n logs
+//   18 gpu jobs  19 gpu wall ns  20 gpu value(Q40)  21 gpu tested  22 gpu hits  23 SL  24 digits
+//   25..64 last 40 log-rates (i64 bits, ring)
+// worker slot (32 u64 fields):
+//   0 pid  1 arm  2 m0  3 M  4 dry  5 gpu  6 started  7 tested  8 out fd  9 last gap  10 last merit(Q32)
+//   11 last completed  12 dry value(Q50)  13 dry cost(Q32 s)  14 calibration prediction(Q40)
+//   15 calibration hits  16 lambda used(Q40/core-h)  17 line length  18 summary length  19 completed
+//   20 killed by us  21 consecutive failed jobs in this slot
+struct Srv {
+    A: *u64, na: u64,
+    W: *u64, nw: u64,
+    LN: *u8, SM: *u8,
+    V: *u64,
+    running: bool, stopping: bool, ends: u64, started: u64, cores: u64,
+    gpu_ok: bool, gpu_on: bool, job_secs: u64, lam: u64, scale: u64, caff: i64, rng: u64,
+    rec_pid: i64, rec_st: u64, bench_pid: i64, bench_st: u64,
+    disc: *u8, dlen: u64, ncpu: u64, port: u64, found: u64,
+}
+fn AS() -> u64 { return 72; }
+fn WS() -> u64 { return 32; }
+fn MAXA() -> u64 { return 32; }
+fn MAXW() -> u64 { return 64; }
+fn LB() -> u64 { return 16384; }
+
+fn av(write s: Srv, i: u64, f: u64) -> u64 { let a = slice(s.A, MAXA() * AS()); return a[i * AS() + f]; }
+fn aset(write s: Srv, i: u64, f: u64, v: u64) { let a = slice(s.A, MAXA() * AS()); a[i * AS() + f] = v; }
+fn aadd(write s: Srv, i: u64, f: u64, v: u64) { let a = slice(s.A, MAXA() * AS()); a[i * AS() + f] = a[i * AS() + f] + v; }
+fn wv(write s: Srv, i: u64, f: u64) -> u64 { let w = slice(s.W, MAXW() * WS()); return w[i * WS() + f]; }
+fn wset(write s: Srv, i: u64, f: u64, v: u64) { let w = slice(s.W, MAXW() * WS()); w[i * WS() + f] = v; }
+fn wadd(write s: Srv, i: u64, f: u64, v: u64) { let w = slice(s.W, MAXW() * WS()); w[i * WS() + f] = w[i * WS() + f] + v; }
+
+fn arm_key(write o: Out, write s: Srv, i: u64) { ps(o, "P"); pu(o, av(s, i, 0)); ps(o, "_d"); pu(o, av(s, i, 1)); ps(o, "_L1e9"); }
+
+fn coprime_q32(d: u64) -> u64 {                   // prod over p | d of (1 - 1/p), Q32
+    let f: u64 = u64(1) << 32;
+    let n = d;
+    let p: u64 = 2;
+    while p * p <= n {
+        if n % p == 0 { f = f - f / p; while n % p == 0 { n = n / p; } }
+        p = p + 1;
+    }
+    if n > 1 { f = f - f / n; }
+    return f;
+}
+fn is_prime_small(n: u64) -> bool {
+    if n < 2 { return false; }
+    let p: u64 = 2;
+    while p * p <= n { if n % p == 0 { return false; } p = p + 1; }
+    return true;
+}
+fn arm_find(write s: Srv, P: u64, d: u64) -> u64 {
+    let i: u64 = 0;
+    while i < s.na { if av(s, i, 0) == P && av(s, i, 1) == d { return i; } i = i + 1; }
+    return MAXA();
+}
+// add arm (P, d) if valid: d squarefree with every prime factor <= P. returns index or MAXA
+fn arm_add(write s: Srv, P: u64, d: u64) -> u64 {
+    let have = arm_find(s, P, d);
+    if have < MAXA() { return have; }
+    if s.na >= MAXA() || P < 11 || P > 200000 || d < 1 { return MAXA(); }
+    let n = d;
+    let p: u64 = 2;
+    while p * p <= n {
+        if n % p == 0 { n = n / p; if n % p == 0 { return MAXA(); } if p > P { return MAXA(); } }
+        p = p + 1;
+    }
+    if n > P { return MAXA(); }
+    let i = s.na;
+    s.na = s.na + 1;
+    let a = slice(s.A, MAXA() * AS());
+    let k: u64 = 0;
+    while k < AS() { a[i * AS() + k] = 0; k = k + 1; }
+    let lnk: u64 = 0;
+    let q: u64 = 2;
+    while q <= P { if is_prime_small(q) { lnk = lnk + ln_q32(q); } q = q + 1; }
+    lnk = lnk - ln_q32(d);
+    a[i * AS() + 0] = P;
+    a[i * AS() + 1] = d;
+    a[i * AS() + 2] = lnk;
+    a[i * AS() + 3] = (2000000 + rng(s) % 18000000) | 1;
+    a[i * AS() + 23] = (25 * lnk) >> 32;
+    a[i * AS() + 24] = (lnk + 66249649223) / 9889527671;
+    return i;
+}
+
+// ---------------------------------------------------------------- the learner (port of brain.py v3.1)
+fn actual_rate(write s: Srv, i: u64) -> u64 {    // achieved records per core-hour, Q40
+    let ns = av(s, i, 6);
+    if ns == 0 { return 0; }
+    return muldiv(av(s, i, 5), 3600000000000, ns);
+}
+// dry-run prices ignore process overhead, so they run high by a ~constant factor: measure it (Q32)
+fn price_scale(write s: Srv) -> u64 {
+    let r: [32]u64;
+    r[0] = 0;
+    let n: u64 = 0;
+    let i: u64 = 0;
+    while i < s.na {
+        if av(s, i, 15) == 2 && av(s, i, 4) > 0 && av(s, i, 6) > 600000000000 && av(s, i, 5) > 0 {
+            let ar_ = actual_rate(s, i);
+            let pr_ = av(s, i, 4);
+            r[n] = muldiv(ar_, u64(1) << 32, pr_);
+            n = n + 1;
+        }
+        i = i + 1;
+    }
+    if n == 0 { return u64(1) << 31; }
+    let a: u64 = 1;                                  // insertion sort, then the median
+    while a < n {
+        let v = r[a];
+        let b = a;
+        while b > 0 && r[b - 1] > v { r[b] = r[b - 1]; b = b - 1; }
+        r[b] = v;
+        a = a + 1;
+    }
+    return r[n / 2];
+}
+struct Post { mu: i64, v: u64 }
+// log-normal posterior on an arm's rate: the dry-run price is a trusted prior (the survivor model is
+// calibrated to ~1%), real jobs refine it. same constants as brain.py.
+fn posterior(write s: Srv, i: u64, scale: u64) -> Post {
+    let mu0: i64 = 0 - 24167014037;                  // ln(3.6e-3 per core-hour)
+    let var0: u64 = u64(16) << 32;
+    if av(s, i, 15) == 2 && av(s, i, 4) > 0 {
+        mu0 = ln_rate(mulsh(av(s, i, 4), scale, 32));
+        var0 = 1546188227;                           // 0.6^2
+    }
+    let nl = av(s, i, 17);
+    let n = nl;
+    if n > 40 { n = 40; }
+    if n == 0 { return Post { mu: mu0, v: var0 }; }
+    let a = slice(s.A, MAXA() * AS());
+    let sum: i64 = 0;
+    let k: u64 = 0;
+    while k < n { sum = sum + i64(a[i * AS() + 25 + k]); k = k + 1; }
+    let m: i64 = sum / i64(n);
+    let v: u64 = 2147483648;                         // 0.5 when n == 1
+    if n > 1 {
+        let ss: u64 = 0;
+        k = 0;
+        while k < n { let dlt = sabs(i64(a[i * AS() + 25 + k]) - m); ss = ss + mulsh(dlt, dlt, 32); k = k + 1; }
+        v = ss / (n - 1);
+        if v < 644245094 { v = 644245094; }          // floor 0.15
+    }
+    let inv0 = muldiv(u64(1) << 32, u64(1) << 32, var0);
+    let nv = muldiv(n << 32, u64(1) << 32, v);
+    let pv = muldiv(u64(1) << 32, u64(1) << 32, inv0 + nv);
+    let t = sdiv32(mu0, var0) + sgn(m < 0, muldiv(n * sabs(m), u64(1) << 32, v));
+    return Post { mu: smul32(t, pv), v: pv };
+}
+fn est_rate(write s: Srv, i: u64, scale: u64) -> u64 {
+    let p = posterior(s, i, scale);
+    return exp_q(p.mu + i64(p.v / 2), 40);
+}
+fn draw(write s: Srv, i: u64, scale: u64) -> i64 {      // thompson sample of ln(rate)
+    let p = posterior(s, i, scale);
+    let z: i64 = 0;
+    let k: u64 = 0;
+    while k < 12 { z = z + i64(rng(s) >> 32); k = k + 1; }
+    z = z - (i64(6) << 32);                               // irwin-hall: ~ N(0, 1), Q32
+    let sd = isqrt(p.v) << 16;
+    return p.mu + smul32(z, sd);
+}
+// the stopping-rule bar: 0.8 x the best trusted achieved rate among the arms being hunted; before any
+// has a real core-hour, half the scaled best dry-run price (v3.0 left it at 0: skip silently off)
+fn compute_lambda(write s: Srv) {
+    let sc = price_scale(s);
+    s.scale = sc;
+    let best: u64 = 0;
+    let i: u64 = 0;
+    while i < s.na {
+        if av(s, i, 16) == 1 && av(s, i, 6) >= 1200000000000 && av(s, i, 7) >= 2 {
+            let r = actual_rate(s, i);
+            let e = est_rate(s, i, sc);
+            if e < r { r = e; }
+            if r > best { best = r; }
+        }
+        i = i + 1;
+    }
+    if best > 0 { s.lam = mulsh(best, 3435973837, 32); return; }   // 0.8
+    let bp: u64 = 0;
+    i = 0;
+    while i < s.na { if av(s, i, 16) == 1 && av(s, i, 15) == 2 && av(s, i, 4) > bp { bp = av(s, i, 4); } i = i + 1; }
+    s.lam = mulsh(bp, sc, 33);                                        // 0.5 * scale * best price
+}
+// pick the next arm: price every arm with a dry run first, then thompson sampling
+fn choose(write s: Srv, allow_dry: bool) -> u64 {
+    let i: u64 = 0;
+    if allow_dry {
+        while i < s.na {
+            if av(s, i, 16) == 1 && av(s, i, 15) == 0 { aset(s, i, 15, 1); return i + 1000; }
+            i = i + 1;
+        }
+    }
+    let sc = price_scale(s);
+    let best: u64 = MAXA();
+    let bd: i64 = 0;
+    i = 0;
+    while i < s.na {
+        if av(s, i, 16) == 1 {
+            let d = draw(s, i, sc);
+            if best == MAXA() || d > bd { best = i; bd = d; }
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+// ---------------------------------------------------------------- files
+fn log_out(write t: Out) {                       // t holds a message: timestamp it into hunt.log
+    let dt: [32]u8;
+    dt[0] = 0;
+    let n = rt_date(&mut dt[0]);
+    let o = out_new(0 - 1, t.len + 64);
+    pb(o, 91); pbs(o, &dt[0..32], 0, n); ps(o, "] ");
+    pbs(o, slice(t.p, t.cap), 0, t.len); pb(o, 10);
+    rt_append("hunt.log", o.p, o.len);
+    rt_free(o.p);
+}
+fn log_line(write b: Out, t: str) { bz(b); ps(b, t); log_out(b); }
+fn save_state(write s: Srv, write b: Out) {
+    bz(b);
+    ps(b, "# hunter state v1 -- raw fixed-point integers (arm field legend: struct Srv in src/hunter.lang)\n");
+    let i: u64 = 0;
+    while i < s.na {
+        arm_key(b, s, i);
+        let k: u64 = 0;
+        while k < AS() { tab(b); if k >= 25 { pi(b, i64(av(s, i, k))); } else { pu(b, av(s, i, k)); } k = k + 1; }
+        pb(b, 10);
+        i = i + 1;
+    }
+    rt_write_atomic("state.tsv", b.p, b.len);
+}
+fn load_state(write s: Srv) {
+    let n = rt_file_size("state.tsv");
+    if n <= 0 { return; }
+    let buf = rt_alloc8(u64(n) + 1);
+    let got = rt_read_at("state.tsv", 0, buf, u64(n));
+    if got <= 0 { rt_free(buf); return; }
+    let t = slice(buf, u64(n) + 1);
+    let N = u64(got);
+    let i: u64 = 0;
+    while i < N {
+        let e = i;
+        while e < N && t[e] != 10 { e = e + 1; }
+        if t[i] == 80 {                                 // 'P'
+            let line = &t[i..e];
+            let L = e - i;
+            let f1 = fld(line, L, 1);
+            let f2 = fld(line, L, 2);
+            let P = num_at(line, f1.lo, f1.hi);
+            let d = num_at(line, f2.lo, f2.hi);
+            let a = arm_add(s, P, d);
+            if a < MAXA() {
+                let k: u64 = 3;
+                while k < AS() {
+                    let f = fld(line, L, k + 1);
+                    if f.lo < f.hi {
+                        if line[f.lo] == 45 { aset(s, a, k, u64(0) - num_at(line, f.lo + 1, f.hi)); }
+                        else { aset(s, a, k, num_at(line, f.lo, f.hi)); }
+                    }
+                    k = k + 1;
+                }
+                if av(s, a, 15) == 1 { aset(s, a, 15, 0); }  // a pricing run that never finished
+                aset(s, a, 16, 0);
+            }
+        }
+        i = e + 1;
+    }
+    rt_free(buf);
+}
+
+// ---------------------------------------------------------------- workers
+fn wpath(write o: Out, i: u64) { bz(o); ps(o, "run/w"); pu(o, i); ps(o, ".out"); bend(o); }
+
+fn spawn_verify(write s: Srv, write b: Out, expr: slice u8, lo: u64, hi: u64, gap: u64) {
+    bz(b);
+    ps(b, "hunter"); pb(b, 0); ps(b, "verify"); pb(b, 0); pbs(b, expr, lo, hi); pb(b, 0); pu(b, gap); pb(b, 0);
+    let v = slice(s.V, 16);
+    let k: u64 = 0;
+    while k < 16 {
+        if v[k] == 0 {
+            let pid = rt_spawn(b.p, 4, 1, "", 0, "run/verify.out");
+            if pid > 0 { v[k] = u64(pid); }
+            return;
+        }
+        k = k + 1;
+    }
+    // all 16 busy: it stays unverified until the next 'verify all'
+}
+
+fn on_line(write s: Srv, i: u64, ln: slice u8, n: u64, write b: Out, write t: Out) {
+    if n < 2 { return; }
+    let ar = wv(s, i, 1);
+    if ln[0] == 83 {                                  // S: a dry-run center (sieve + score only)
+        let cp = fld(ln, n, 4);
+        let vp = fld(ln, n, 7);
+        let cpol = parse_q32(ln, cp.lo, cp.hi);
+        let vpol = parse_sci_s(ln, vp.lo, vp.hi);
+        let lam_s = muldiv(wv(s, i, 16), u64(1) << 22, 3600);
+        if vpol > 0 && vpol >= mulsh(lam_s, cpol, 32) { wadd(s, i, 12, vpol >> 12); wadd(s, i, 13, cpol); }
+        return;
+    }
+    if ln[0] == 35 {                                  // #: job summary
+        let sm = slice(s.SM, MAXW() * 2048);
+        let k: u64 = 0;
+        while k < n && k < 2047 { sm[i * 2048 + k] = ln[k]; k = k + 1; }
+        wset(s, i, 18, k);
+        return;
+    }
+    if ln[0] != 84 { return; }                        // T: a tested center
+    bz(b);
+    arm_key(b, s, ar);
+    pbs(b, ln, 1, n);
+    pb(b, 10);
+    rt_append("gaps.tsv", b.p, b.len);
+    let fm = fld(ln, n, 1);
+    let fdone = fld(ln, n, 5);
+    let fa = fld(ln, n, 6);
+    let fg = fld(ln, n, 8);
+    let fmer = fld(ln, n, 9);
+    let frec = fld(ln, n, 10);
+    let fhit = fld(ln, n, 15);
+    let fsc = fld(ln, n, 17);
+    let done = fdone.lo < fdone.hi && ln[fdone.lo] == 49;
+    let gap = num_at(ln, fg.lo, fg.hi);
+    let merit = parse_q32(ln, fmer.lo, fmer.hi);
+    wadd(s, i, 7, 1);
+    wset(s, i, 9, gap);
+    wset(s, i, 10, merit);
+    if done { wset(s, i, 11, 1); wadd(s, i, 19, 1); } else { wset(s, i, 11, 0); }
+    wadd(s, i, 14, parse_sci_s(ln, fsc.lo, fsc.hi) >> 22);
+    if done && merit >= (u64(15) << 32) { wadd(s, i, 15, 1); }
+    if fhit.lo < fhit.hi && ln[fhit.lo] == 49 {
+        // a record. FOUND.tsv first (it is what matters), then the log, then an independent check
+        bz(b);
+        pbs(b, ln, fg.lo, fg.hi); tab(b); pbs(b, ln, fmer.lo, fmer.hi); tab(b);
+        let e0 = b.len;
+        pbs(b, ln, fm.lo, fm.hi); pb(b, 42); pu(b, av(s, ar, 0)); ps(b, "#/"); pu(b, av(s, ar, 1)); pb(b, 45); pbs(b, ln, fa.lo, fa.hi);
+        let e1 = b.len;
+        ps(b, "\tprevious_record_merit="); pbs(b, ln, frec.lo, frec.hi); tab(b);
+        let dt: [32]u8;
+        dt[0] = 0;
+        let dn = rt_date(&mut dt[0]);
+        pbs(b, &dt[0..32], 0, dn); pb(b, 10);
+        rt_append("FOUND.tsv", b.p, b.len);
+        s.found = s.found + 1;
+        let bb = slice(b.p, b.cap);
+        let expr = rt_alloc8(e1 - e0 + 1);
+        let ex = slice(expr, e1 - e0 + 1);
+        let q: u64 = 0;
+        while q < e1 - e0 { ex[q] = bb[e0 + q]; q = q + 1; }
+        bz(t);
+        ps(t, "*** RECORD  gap "); pbs(t, ln, fg.lo, fg.hi); ps(t, "  merit "); pbs(t, ln, fmer.lo, fmer.hi);
+        ps(t, "  (old "); pbs(t, ln, frec.lo, frec.hi); ps(t, ")  "); pbs(t, ex, 0, e1 - e0); ps(t, "  -> FOUND.tsv, verifying");
+        log_out(t);
+        spawn_verify(s, b, ex, 0, e1 - e0, gap);
+        rt_free(expr);
+    }
+}
+
+// read whatever the worker has written since last time; hand complete lines to on_line
+fn pump(write s: Srv, i: u64, write b: Out, write t: Out, write rd: Out) {
+    let fd = wv(s, i, 8);
+    if fd == 0 { return; }
+    let lb = slice(s.LN, MAXW() * LB());
+    let base = i * LB();
+    while true {
+        let r = rt_read_fd(i64(fd - 1), rd.p, rd.cap);
+        if r <= 0 { return; }
+        let src = slice(rd.p, rd.cap);
+        let k: u64 = 0;
+        while k < u64(r) {
+            let c = src[k];
+            let L = wv(s, i, 17);
+            if c == 10 {
+                on_line(s, i, &lb[base..base + LB()], L, b, t);
+                wset(s, i, 17, 0);
+            } else {
+                if L + 1 < LB() { lb[base + L] = c; wset(s, i, 17, L + 1); }
+            }
+            k = k + 1;
+        }
+    }
+}
+
+fn finish(write s: Srv, i: u64, st: i32, write b: Out, write t: Out) {
+    let ar = wv(s, i, 1);
+    rt_close_fd(i64(wv(s, i, 8) - 1));
+    wset(s, i, 0, 0);
+    wset(s, i, 8, 0);
+    let sm = slice(s.SM, MAXW() * 2048);
+    let n = wv(s, i, 18);
+    let line = &sm[i * 2048..i * 2048 + 2048];
+    let dry = wv(s, i, 4) == 1;
+    let gpu = wv(s, i, 5) == 1;
+    let M = wv(s, i, 3);
+    if n == 0 {
+        if dry { aset(s, ar, 15, 0); }
+        bz(t);
+        ps(t, "core "); pu(t, i); ps(t, " job ended without a summary (exit "); pi(t, i64(st));
+        if wv(s, i, 20) == 1 { ps(t, ", stopped by you)"); } else {
+            ps(t, ") -- its output is in run/w"); pu(t, i); ps(t, ".out");
+            wadd(s, i, 21, 1);
+        }
+        log_out(t);
+        if wv(s, i, 21) >= 3 && s.running && !s.stopping {
+            // a crash loop helps nobody: pause and say why instead of respawning forever
+            s.stopping = true;
+            log_line(b, "workers keep failing, so the hunt is pausing. check run/w*.out, then start again");
+        }
+        return;
+    }
+    wset(s, i, 21, 0);
+    let fs_ = kv(line, n, "sieve_s");
+    let fc = kv(line, n, "score_s");
+    let fv = kv(line, n, "value");
+    let fcpu = kv(line, n, "cpu_s");
+    let ftot = kv(line, n, "total_s");
+    let ft = kv(line, n, "tested");
+    let fco = kv(line, n, "completed");
+    let fh = kv(line, n, "hits");
+    let fca = kv(line, n, "cand");
+    let fpre = kv(line, n, "pre_s");
+    let total_ns = muldiv(parse_q32(line, ftot.lo, ftot.hi), 1000000000, u64(1) << 32);
+    bz(b);
+    pu(b, rt_unix_s()); tab(b);
+    bz(t);
+    if dry {
+        let over = parse_q32(line, fs_.lo, fs_.hi) + parse_q32(line, fc.lo, fc.hi);
+        let den = over + wv(s, i, 13);
+        let price: u64 = 0;
+        if den > 0 { price = muldiv(wv(s, i, 12) >> 10, u64(3600) << 32, den); }
+        aset(s, ar, 4, price);
+        aset(s, ar, 15, 2);
+        ps(b, "dry\t"); arm_key(b, s, ar); tab(b); pu(b, M); tab(b); psci(b, wv(s, i, 16), 40, 4); tab(b);
+        psci(b, price, 40, 4); tab(b); pbs(b, line, fca.lo, fca.hi); pb(b, 10);
+        ps(t, "core "); pu(t, i); ps(t, "  priced "); arm_key(t, s, ar); ps(t, "  model rate ");
+        psci(t, price, 40, 2); ps(t, " records/core-h");
+    } else {
+        let value = parse_sci_s(line, fv.lo, fv.hi) >> 22;
+        let cpu_ns = muldiv(parse_q32(line, fcpu.lo, fcpu.hi), 1000000000, u64(1) << 32);
+        let tested = num_at(line, ft.lo, ft.hi);
+        let hits = num_at(line, fh.lo, fh.hi);
+        let rate: u64 = 0;
+        if gpu {
+            aadd(s, ar, 18, 1); aadd(s, ar, 19, total_ns); aadd(s, ar, 20, value);
+            aadd(s, ar, 21, tested); aadd(s, ar, 22, hits);
+            if total_ns > 0 { rate = muldiv(value, 3600000000000, total_ns); }
+        } else {
+            if cpu_ns > 0 { rate = muldiv(value, 3600000000000, cpu_ns); }
+            aadd(s, ar, 5, value); aadd(s, ar, 6, cpu_ns); aadd(s, ar, 7, 1);
+            let a = slice(s.A, MAXA() * AS());
+            let nl = av(s, ar, 17);
+            a[ar * AS() + 25 + (nl % 40)] = u64(ln_rate(rate));
+            aset(s, ar, 17, nl + 1);
+            let cp_ = wv(s, i, 14);
+            let ch_ = wv(s, i, 15);
+            aadd(s, ar, 12, cp_); aadd(s, ar, 13, ch_);
+            aadd(s, ar, 8, tested); aadd(s, ar, 9, num_at(line, fco.lo, fco.hi));
+            aadd(s, ar, 10, hits); aadd(s, ar, 11, num_at(line, fca.lo, fca.hi));
+            if M > 0 { aset(s, ar, 14, total_ns / M); }
+        }
+        if gpu { ps(b, "gpu\t"); } else { ps(b, "job\t"); }
+        arm_key(b, s, ar); tab(b); pu(b, M); tab(b); psci(b, wv(s, i, 16), 40, 4); tab(b);
+        psci(b, rate, 40, 4); tab(b); psci(b, value, 40, 4); tab(b);
+        pbs(b, line, fcpu.lo, fcpu.hi); tab(b); pbs(b, line, ftot.lo, ftot.hi); tab(b);
+        pbs(b, line, ft.lo, ft.hi); tab(b); pbs(b, line, fca.lo, fca.hi); tab(b);
+        pbs(b, line, fco.lo, fco.hi); tab(b); pbs(b, line, fh.lo, fh.hi); tab(b);
+        psci(b, wv(s, i, 14), 40, 4); tab(b); pu(b, wv(s, i, 15)); tab(b);
+        pbs(b, line, fpre.lo, fpre.hi); pb(b, 10);
+        ps(t, "core "); pu(t, i); if gpu { ps(t, " (gpu)"); } ps(t, "  "); arm_key(t, s, ar);
+        ps(t, "  tested "); pbs(t, line, ft.lo, ft.hi); pb(t, 47); pbs(t, line, fca.lo, fca.hi);
+        ps(t, "  rate "); psci(t, rate, 40, 2); ps(t, "/core-h");
+        if hits > 0 { ps(t, "  *** "); pu(t, hits); ps(t, " RECORD(S)"); }
+    }
+    rt_append("jobs.tsv", b.p, b.len);
+    log_out(t);
+    save_state(s, b);
+}
+
+fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
+    let isgpu = s.gpu_on && i == s.nw - 1;
+    let c = choose(s, !isgpu);
+    if c == MAXA() { return; }
+    let dry = c >= 1000;
+    let ar = c;
+    if dry { ar = c - 1000; }
+    compute_lambda(s);
+    let P = av(s, ar, 0);
+    let d = av(s, ar, 1);
+    let cf = coprime_q32(d);
+    let M: u64 = 0;
+    if dry {
+        M = muldiv(300, u64(1) << 32, cf);
+        if M < 50 { M = 50; }
+    } else {
+        let spm = av(s, ar, 14);
+        if spm == 0 {
+            // 4.6 s * coprime(d) * (P/4001)^2.6, measured on the m4 max
+            let lr = i64(ln_q32(P)) - i64(ln_q32(4001));
+            let grow = exp_q(smul32(lr, 11166914970), 32);
+            spm = muldiv(mulsh(19756849562, cf, 32), mulsh(grow, 1000000000, 32), u64(1) << 32);
+            if spm == 0 { spm = 1; }
+        }
+        M = s.job_secs * 1000000000 / spm;
+        if M < 20 { M = 20; }
+    }
+    let m0 = av(s, ar, 3);
+    aset(s, ar, 3, m0 + M + (M & 1));
+    bz(b);
+    ps(b, "hunter"); pb(b, 0); ps(b, "hunt"); pb(b, 0);
+    pu(b, P); pb(b, 0); pu(b, d); pb(b, 0); pu(b, m0); pb(b, 0); pu(b, M); pb(b, 0);
+    pu(b, av(s, ar, 23)); pb(b, 0); ps(b, "1e9"); pb(b, 0);
+    psci(b, muldiv(s.lam, u64(1) << 22, 3600), 62, 6); pb(b, 0);
+    ps(b, "15"); pb(b, 0); ps(b, "records.txt"); pb(b, 0);
+    bz(t);
+    if dry { ps(t, "HUNT_DRY=1"); pb(t, 0); }
+    if isgpu { ps(t, "HUNTER_GPU=1"); pb(t, 0); }
+    let nenv: i32 = 0;
+    if dry { nenv = nenv + 1; }
+    if isgpu { nenv = nenv + 1; }
+    rt_mkdir("run");
+    let path = out_new(0 - 1, 64);
+    wpath(path, i);
+    rt_append(path.p, "", 0);
+    let fd = rt_open_r(path.p);
+    let pid = rt_spawn(b.p, 11, 1, t.p, nenv, path.p);
+    rt_free(path.p);
+    if pid <= 0 {
+        if fd >= 0 { rt_close_fd(fd); }
+        if dry { aset(s, ar, 15, 0); }
+        log_line(b, "could not start a worker process");
+        return;
+    }
+    let fails = wv(s, i, 21);
+    let k: u64 = 0;
+    while k < WS() { wset(s, i, k, 0); k = k + 1; }
+    wset(s, i, 21, fails);
+    wset(s, i, 0, u64(pid)); wset(s, i, 1, ar); wset(s, i, 2, m0); wset(s, i, 3, M);
+    if dry { wset(s, i, 4, 1); }
+    if isgpu { wset(s, i, 5, 1); }
+    wset(s, i, 6, rt_unix_s());
+    wset(s, i, 8, u64(fd + 1));
+    let lam_now = s.lam;
+    wset(s, i, 16, lam_now);
+}
+
+fn busy(write s: Srv) -> u64 {
+    let n: u64 = 0;
+    let i: u64 = 0;
+    while i < MAXW() { if wv(s, i, 0) != 0 { n = n + 1; } i = i + 1; }
+    return n;
+}
+
+// ---------------------------------------------------------------- the live record table
+// download the official table; it doubles as records.txt (gap merit who ...) and as the
+// "is my record still on top" check for everything in FOUND.tsv
+fn start_records(write s: Srv, write b: Out) {
+    if s.rec_pid > 0 { return; }
+    bz(b);
+    ps(b, "curl"); pb(b, 0); ps(b, "-sfL"); pb(b, 0); ps(b, "--max-time"); pb(b, 0); ps(b, "240"); pb(b, 0);
+    ps(b, "-o"); pb(b, 0); ps(b, "merits.tmp"); pb(b, 0);
+    ps(b, "https://primegaps.cloudygo.com/merits.txt"); pb(b, 0);
+    s.rec_pid = rt_spawn(b.p, 7, 0, "", 0, "run/curl.out");
+    if s.rec_pid > 0 { s.rec_st = 1; } else { s.rec_st = 3; }
+}
+fn records_done(write s: Srv, code: i32, write b: Out) {
+    s.rec_pid = 0;
+    let sz = rt_file_size("merits.tmp");
+    if code != 0 || sz < 1000000 { s.rec_st = 3; log_line(b, "record table download failed (kept the old records.txt)"); return; }
+    rt_rename("records.txt", "records.bak");
+    rt_rename("merits.tmp", "records.txt");
+    // the gaps we hold, from FOUND.tsv
+    let want: [512]u64;
+    want[0] = 0;
+    let nw: u64 = 0;
+    let fsz = rt_file_size("FOUND.tsv");
+    if fsz > 0 {
+        let fb = rt_alloc8(u64(fsz) + 1);
+        let got = rt_read_at("FOUND.tsv", 0, fb, u64(fsz));
+        let f = slice(fb, u64(fsz) + 1);
+        let i: u64 = 0;
+        while i < u64(got) && nw < 512 {
+            if isdig(f[i]) { want[nw] = num_at(f, i, u64(got)); nw = nw + 1; }
+            while i < u64(got) && f[i] != 10 { i = i + 1; }
+            i = i + 1;
+        }
+        rt_free(fb);
+    }
+    let rb = rt_alloc8(u64(sz) + 1);
+    let got = rt_read_at("records.txt", 0, rb, u64(sz));
+    let r = slice(rb, u64(sz) + 1);
+    bz(b);
+    ps(b, "# checked "); pu(b, rt_unix_s()); pb(b, 10);
+    let i: u64 = 0;
+    let lines: u64 = 0;
+    while i < u64(got) {
+        let e = i;
+        while e < u64(got) && r[e] != 10 { e = e + 1; }
+        if isdig(r[i]) {
+            lines = lines + 1;
+            let g = num_at(r, i, e);
+            let k: u64 = 0;
+            while k < nw {
+                if want[k] == g {
+                    // gap, merit, who: the first three whitespace-separated fields
+                    let j = i;
+                    let fcount: u64 = 0;
+                    while j < e && fcount < 3 {
+                        while j < e && r[j] != 32 && r[j] != 9 { pb(b, r[j]); j = j + 1; }
+                        fcount = fcount + 1;
+                        while j < e && (r[j] == 32 || r[j] == 9) { j = j + 1; }
+                        if fcount < 3 { tab(b); }
+                    }
+                    pb(b, 10);
+                    k = nw;
+                }
+                k = k + 1;
+            }
+        }
+        i = e + 1;
+    }
+    rt_free(rb);
+    rt_write_atomic("table.tsv", b.p, b.len);
+    s.rec_st = 2;
+    bz(b);
+    ps(b, "records.txt refreshed from the live table (");
+    pu(b, lines);
+    ps(b, " gap sizes), checked ");
+    pu(b, nw);
+    ps(b, " of ours");
+    log_out(b);
+}
+
+fn verify_pending(write s: Srv, write b: Out) -> u64 {
+    // every FOUND expr that has no OK/FAILED line in VERIFIED.tsv
+    let fsz = rt_file_size("FOUND.tsv");
+    if fsz <= 0 { return 0; }
+    let vsz = rt_file_size("VERIFIED.tsv");
+    let fb = rt_alloc8(u64(fsz) + 1);
+    let fg = rt_read_at("FOUND.tsv", 0, fb, u64(fsz));
+    let f = slice(fb, u64(fsz) + 1);
+    let vn: u64 = 0;
+    if vsz > 0 { vn = u64(vsz); }
+    let vb = rt_alloc8(vn + 1);
+    let vg: i64 = 0;
+    if vn > 0 { vg = rt_read_at("VERIFIED.tsv", 0, vb, vn); }
+    let v = slice(vb, vn + 1);
+    let started: u64 = 0;
+    let i: u64 = 0;
+    while i < u64(fg) {
+        let e = i;
+        while e < u64(fg) && f[e] != 10 { e = e + 1; }
+        if isdig(f[i]) {
+            let line = &f[i..e];
+            let L = e - i;
+            let fe = fld(line, L, 2);
+            let gap = num_at(line, 0, L);
+            // look for "\t<expr>\tOK" or FAILED in VERIFIED.tsv
+            let seen = false;
+            let j: u64 = 0;
+            while j < u64(vg) && !seen {
+                let ve = j;
+                while ve < u64(vg) && v[ve] != 10 { ve = ve + 1; }
+                let vl = &v[j..ve];
+                let x = fld(vl, ve - j, 2);
+                let st = fld(vl, ve - j, 3);
+                if x.hi - x.lo == fe.hi - fe.lo && x.hi > x.lo {
+                    let same = true;
+                    let q: u64 = 0;
+                    while q < x.hi - x.lo { if vl[x.lo + q] != line[fe.lo + q] { same = false; } q = q + 1; }
+                    if same && (eqs(vl, st.lo, st.hi, "OK") || eqs(vl, st.lo, st.hi, "FAILED")) { seen = true; }
+                }
+                j = ve + 1;
+            }
+            if !seen && fe.hi > fe.lo { spawn_verify(s, b, line, fe.lo, fe.hi, gap); started = started + 1; }
+        }
+        i = e + 1;
+    }
+    rt_free(fb);
+    rt_free(vb);
+    return started;
+}
+
+// ---------------------------------------------------------------- one scheduler tick
+fn tick(write s: Srv, write b: Out, write t: Out, write rd: Out) {
+    let i: u64 = 0;
+    while i < MAXW() {
+        let pid = wv(s, i, 0);
+        if pid != 0 {
+            pump(s, i, b, t, rd);
+            let st = rt_reap(i64(pid));
+            if st >= 0 { pump(s, i, b, t, rd); finish(s, i, st, b, t); }
+        }
+        i = i + 1;
+    }
+    let v = slice(s.V, 16);
+    let k: u64 = 0;
+    while k < 16 { if v[k] != 0 { if rt_reap(i64(v[k])) >= 0 { v[k] = 0; } } k = k + 1; }
+    if s.rec_pid > 0 { let c = rt_reap(s.rec_pid); if c >= 0 { records_done(s, c, b); } }
+    if s.bench_pid > 0 { let c = rt_reap(s.bench_pid); if c >= 0 { s.bench_pid = 0; s.bench_st = 2; } }
+    if s.running {
+        let now = rt_unix_s();
+        if now >= s.ends && !s.stopping { s.stopping = true; log_line(b, "time is up: finishing the running jobs"); }
+        if !s.stopping {
+            i = 0;
+            while i < s.nw { if wv(s, i, 0) == 0 { start_job(s, i, b, t); } i = i + 1; }
+        }
+        if s.stopping && busy(s) == 0 {
+            s.running = false;
+            if s.caff > 0 { rt_kill(s.caff, 15); rt_reap(s.caff); s.caff = 0; }
+            log_line(b, "hunt finished");
+            save_state(s, b);
+        }
+    }
+}
+
+// ---------------------------------------------------------------- http
+fn reply(conn: i64, code: str, ctype: str, body: *const u8, n: u64, write h: Out) {
+    bz(h);
+    ps(h, "HTTP/1.1 "); ps(h, code); ps(h, "\r\nContent-Type: "); ps(h, ctype);
+    ps(h, "\r\nContent-Length: "); pu(h, n);
+    ps(h, "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
+    rt_send_all(conn, h.p, h.len);
+    if n > 0 { rt_send_all(conn, body, n); }
+}
+fn reply_msg(conn: i64, ok: bool, msg: str, write b: Out, write h: Out) {
+    bz(b);
+    if ok { ps(b, "{\"ok\":true,\"msg\":\""); } else { ps(b, "{\"ok\":false,\"msg\":\""); }
+    ps(b, msg); ps(b, "\"}");
+    reply(conn, "200 OK", "application/json", b.p, b.len, h);
+}
+fn jb(write o: Out, v: bool) { if v { ps(o, "true"); } else { ps(o, "false"); } }
+
+fn status_json(write s: Srv, write b: Out) {
+    bz(b);
+    compute_lambda(s);
+    let sc = s.scale;
+    ps(b, "{\"engine\":\"praetor\",\"now\":"); pu(b, rt_unix_s());
+    ps(b, ",\"running\":"); jb(b, s.running); ps(b, ",\"stopping\":"); jb(b, s.stopping);
+    ps(b, ",\"started\":"); pu(b, s.started); ps(b, ",\"ends\":"); pu(b, s.ends);
+    ps(b, ",\"cores\":"); pu(b, s.cores); ps(b, ",\"ncpu\":"); pu(b, s.ncpu);
+    ps(b, ",\"job_secs\":"); pu(b, s.job_secs);
+    ps(b, ",\"gpu\":{\"ok\":"); jb(b, s.gpu_ok); ps(b, ",\"on\":"); jb(b, s.gpu_on); ps(b, ",\"name\":\"");
+    let gn = rt_gpu_name();
+    let gs = slice(gn, rt_strlen(gn));
+    let q: u64 = 0;
+    while q < gs.len { if gs[q] != 34 && gs[q] != 92 && gs[q] >= 32 { pb(b, gs[q]); } q = q + 1; }
+    ps(b, "\"},\"lambda\":"); psci(b, s.lam, 40, 4);
+    ps(b, ",\"price_scale\":"); pfix(b, sc, 32, 4);
+    ps(b, ",\"discoverer\":\""); pbs(b, slice(s.disc, 16), 0, s.dlen);
+    ps(b, "\",\"tasks\":{\"records\":"); pu(b, s.rec_st); ps(b, ",\"bench\":"); pu(b, s.bench_st);
+    let nv: u64 = 0;
+    let v = slice(s.V, 16);
+    q = 0;
+    while q < 16 { if v[q] != 0 { nv = nv + 1; } q = q + 1; }
+    ps(b, ",\"verifying\":"); pu(b, nv); ps(b, "}");
+    ps(b, ",\"found_session\":"); pu(b, s.found);
+    ps(b, ",\"workers\":[");
+    let first = true;
+    let i: u64 = 0;
+    while i < MAXW() {
+        if wv(s, i, 0) != 0 {
+            if !first { pb(b, 44); }
+            first = false;
+            let ar = wv(s, i, 1);
+            ps(b, "{\"id\":"); pu(b, i); ps(b, ",\"arm\":\""); arm_key(b, s, ar);
+            ps(b, "\",\"P\":"); pu(b, av(s, ar, 0)); ps(b, ",\"d\":"); pu(b, av(s, ar, 1));
+            ps(b, ",\"digits\":"); pu(b, av(s, ar, 24));
+            ps(b, ",\"m0\":"); pu(b, wv(s, i, 2)); ps(b, ",\"M\":"); pu(b, wv(s, i, 3));
+            ps(b, ",\"dry\":"); jb(b, wv(s, i, 4) == 1); ps(b, ",\"gpu\":"); jb(b, wv(s, i, 5) == 1);
+            ps(b, ",\"started\":"); pu(b, wv(s, i, 6)); ps(b, ",\"tested\":"); pu(b, wv(s, i, 7));
+            ps(b, ",\"completed\":"); pu(b, wv(s, i, 19));
+            ps(b, ",\"last_gap\":"); pu(b, wv(s, i, 9)); ps(b, ",\"last_merit\":"); pfix(b, wv(s, i, 10), 32, 2);
+            ps(b, ",\"last_done\":"); jb(b, wv(s, i, 11) == 1);
+            ps(b, ",\"est_secs\":");
+            let spm = av(s, ar, 14);
+            if wv(s, i, 4) == 1 || spm == 0 { ps(b, "null"); } else { pu(b, spm * wv(s, i, 3) / 1000000000); }
+            pb(b, 125);
+        }
+        i = i + 1;
+    }
+    ps(b, "],\"arms\":[");
+    i = 0;
+    while i < s.na {
+        if i > 0 { pb(b, 44); }
+        ps(b, "{\"key\":\""); arm_key(b, s, i);
+        ps(b, "\",\"P\":"); pu(b, av(s, i, 0)); ps(b, ",\"d\":"); pu(b, av(s, i, 1));
+        ps(b, ",\"digits\":"); pu(b, av(s, i, 24)); ps(b, ",\"on\":"); jb(b, av(s, i, 16) == 1);
+        ps(b, ",\"priced\":"); pu(b, av(s, i, 15));
+        ps(b, ",\"prior\":"); psci(b, mulsh(av(s, i, 4), sc, 32), 40, 4);
+        let p = posterior(s, i, sc);
+        let unpriced = av(s, i, 15) != 2 && av(s, i, 17) == 0;
+        if unpriced { ps(b, ",\"est\":null,\"lo\":null,\"hi\":null"); } else {
+            let sd = isqrt(p.v) << 16;
+            let w = smul32(i64(sd), 7043746365);                         // 1.64 sd: a 90% band
+            ps(b, ",\"est\":"); psci(b, exp_q(p.mu + i64(p.v / 2), 40), 40, 4);
+            ps(b, ",\"lo\":"); psci(b, exp_q(p.mu - w, 40), 40, 4);
+            ps(b, ",\"hi\":"); psci(b, exp_q(p.mu + w, 40), 40, 4);
+        }
+        ps(b, ",\"jobs\":"); pu(b, av(s, i, 7));
+        ps(b, ",\"coreh\":"); pfix(b, muldiv(av(s, i, 6), u64(1) << 32, 3600000000000), 32, 3);
+        ps(b, ",\"tested\":"); pu(b, av(s, i, 8)); ps(b, ",\"completed\":"); pu(b, av(s, i, 9));
+        ps(b, ",\"hits\":"); pu(b, av(s, i, 10)); ps(b, ",\"cand\":"); pu(b, av(s, i, 11));
+        ps(b, ",\"value\":"); psci(b, av(s, i, 5), 40, 4);
+        ps(b, ",\"pcal\":"); pfix(b, av(s, i, 12), 40, 3); ps(b, ",\"calhits\":"); pu(b, av(s, i, 13));
+        ps(b, ",\"gpu_jobs\":"); pu(b, av(s, i, 18));
+        ps(b, ",\"gpu_h\":"); pfix(b, muldiv(av(s, i, 19), u64(1) << 32, 3600000000000), 32, 3);
+        ps(b, ",\"gpu_value\":"); psci(b, av(s, i, 20), 40, 4);
+        ps(b, ",\"gpu_tested\":"); pu(b, av(s, i, 21)); ps(b, ",\"gpu_hits\":"); pu(b, av(s, i, 22));
+        pb(b, 125);
+        i = i + 1;
+    }
+    ps(b, "]}");
+}
+
+fn default_arms(write s: Srv) {
+    let ps_: [4]u64;
+    ps_[0] = 4001; ps_[1] = 6007; ps_[2] = 8009; ps_[3] = 12007;
+    let i: u64 = 0;
+    while i < 4 { arm_add(s, ps_[i], 210); arm_add(s, ps_[i], 2310); i = i + 1; }
+}
+
+fn start_hunt(write s: Srv, body: slice u8, n: u64, write b: Out) -> bool {
+    if s.running { return false; }
+    if rt_file_size("records.txt") < 1000000 { return false; }
+    let fc = kv(body, n, "cores");
+    let fh = kv(body, n, "hours");
+    let fj = kv(body, n, "job");
+    let fg = kv(body, n, "gpu");
+    let fa = kv(body, n, "arms");
+    let cores = s.ncpu - 2;
+    if s.ncpu < 3 { cores = 1; }
+    if fc.hi > fc.lo { cores = num_at(body, fc.lo, fc.hi); }
+    if cores < 1 { cores = 1; }
+    if cores > 62 { cores = 62; }
+    let hours: u64 = u64(8) << 32;
+    if fh.hi > fh.lo { hours = parse_q32(body, fh.lo, fh.hi); }
+    if hours < (u64(1) << 26) { hours = u64(1) << 26; }
+    s.job_secs = 600;
+    if fj.hi > fj.lo { s.job_secs = num_at(body, fj.lo, fj.hi); }
+    if s.job_secs < 20 { s.job_secs = 20; }
+    s.gpu_on = s.gpu_ok && fg.hi > fg.lo && body[fg.lo] == 49;
+    // arms: "4001.210,6007.2310" -- anything missing from the list is switched off
+    let i: u64 = 0;
+    while i < s.na { aset(s, i, 16, 0); if av(s, i, 15) == 1 { aset(s, i, 15, 0); } i = i + 1; }
+    let picked: u64 = 0;
+    let j = fa.lo;
+    while j < fa.hi {
+        let P = num_at(body, j, fa.hi);
+        while j < fa.hi && isdig(body[j]) { j = j + 1; }
+        let d: u64 = 0;
+        if j < fa.hi && (body[j] == 46 || body[j] == 120 || body[j] == 47) {
+            j = j + 1;
+            d = num_at(body, j, fa.hi);
+            while j < fa.hi && isdig(body[j]) { j = j + 1; }
+        }
+        if P > 0 && d > 0 {
+            let a = arm_add(s, P, d);
+            if a < MAXA() { aset(s, a, 16, 1); picked = picked + 1; }
+        }
+        while j < fa.hi && !isdig(body[j]) { j = j + 1; }
+    }
+    if picked == 0 {
+        default_arms(s);
+        i = 0;
+        while i < 8 { aset(s, i, 16, 1); i = i + 1; }
+    }
+    let wi: u64 = 0;
+    while wi < MAXW() { wset(s, wi, 21, 0); wi = wi + 1; }
+    s.cores = cores;
+    s.nw = cores;
+    if s.gpu_on { s.nw = cores + 1; }
+    s.running = true;
+    s.stopping = false;
+    s.started = rt_unix_s();
+    s.ends = s.started + mulsh(hours, 3600, 32);
+    s.found = 0;
+    if rt_is_darwin() == 1 && s.caff == 0 {
+        bz(b);
+        ps(b, "caffeinate"); pb(b, 0); ps(b, "-i"); pb(b, 0);    // keep the mac awake while hunting
+        s.caff = rt_spawn(b.p, 2, 0, "", 0, "/dev/null");
+    }
+    bz(b);
+    ps(b, "==== hunt started: "); pu(b, cores); ps(b, " cores");
+    if s.gpu_on { ps(b, " + gpu"); }
+    ps(b, ", "); pfix(b, hours, 32, 2); ps(b, " h, jobs of "); pu(b, s.job_secs); ps(b, " s ====");
+    let msg = slice(b.p, b.cap);
+    let L = b.len;
+    let t = out_new(0 - 1, 256);
+    let dt: [32]u8;
+    dt[0] = 0;
+    let dn = rt_date(&mut dt[0]);
+    pb(t, 91); pbs(t, &dt[0..32], 0, dn); ps(t, "] "); pbs(t, msg, 0, L); pb(t, 10);
+    rt_append("hunt.log", t.p, t.len);
+    rt_free(t.p);
+    save_state(s, b);
+    return true;
+}
+
+fn serve_file(conn: i64, name: str, ctype: str, from: u64, cap: u64, write b: Out, write h: Out) {
+    let sz = rt_file_size(name.bytes.ptr);
+    if sz < 0 { reply(conn, "200 OK", ctype, "", 0, h); return; }
+    let n = u64(sz);
+    let st = from;
+    if st > n { st = n; }
+    let len = n - st;
+    if len > cap { len = cap; }
+    let buf = rt_alloc8(len + 1);
+    let got = rt_read_at(name.bytes.ptr, st, buf, len);
+    if got < 0 { got = 0; }
+    bz(h);
+    ps(h, "HTTP/1.1 200 OK\r\nContent-Type: "); ps(h, ctype);
+    ps(h, "\r\nContent-Length: "); pu(h, u64(got));
+    ps(h, "\r\nX-File-Size: "); pu(h, n);
+    ps(h, "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
+    rt_send_all(conn, h.p, h.len);
+    rt_send_all(conn, buf, u64(got));
+    rt_free(buf);
+}
+
+fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Out, write t: Out) {
+    // read the request: headers, then Content-Length bytes of body
+    bz(rq);
+    let r = slice(rq.p, rq.cap);
+    let hend: u64 = 0;
+    let clen: u64 = 0;
+    let tries: u64 = 0;
+    while tries < 40 {
+        if rq.len + 1 >= rq.cap { tries = 40; } else {
+            let got = rt_recv_ms(conn, &mut r[rq.len], rq.cap - rq.len - 1, 250);
+            if got <= 0 { tries = 40; } else {
+                rq.len = rq.len + u64(got);
+                if hend == 0 {
+                    let k: u64 = 3;
+                    while k < rq.len && hend == 0 {
+                        if r[k - 3] == 13 && r[k - 2] == 10 && r[k - 1] == 13 && r[k] == 10 { hend = k + 1; }
+                        k = k + 1;
+                    }
+                    if hend > 0 {
+                        // content-length (any case)
+                        let k2: u64 = 0;
+                        while k2 + 15 < hend {
+                            if (r[k2] == 67 || r[k2] == 99) && (r[k2 + 8] == 76 || r[k2 + 8] == 108) && r[k2 + 14] == 58 {
+                                let v = k2 + 15;
+                                while v < hend && r[v] == 32 { v = v + 1; }
+                                clen = num_at(r, v, hend);
+                            }
+                            k2 = k2 + 1;
+                        }
+                    }
+                }
+                if hend > 0 && rq.len >= hend + clen { tries = 40; }
+            }
+        }
+        tries = tries + 1;
+    }
+    if hend == 0 { rt_close_fd(conn); return; }
+    let post = starts(r, rq.len, 0, "POST ");
+    let p0: u64 = 4;
+    if post { p0 = 5; }
+    let p1 = p0;
+    while p1 < hend && r[p1] != 32 && r[p1] != 63 { p1 = p1 + 1; }
+    let q0 = p1;
+    let q1 = p1;
+    if p1 < hend && r[p1] == 63 { q0 = p1 + 1; q1 = q0; while q1 < hend && r[q1] != 32 { q1 = q1 + 1; } }
+    let body = &r[hend..rq.cap];
+    let bl = rq.len - hend;
+    if !post {
+        if eqs(r, p0, p1, "/") || eqs(r, p0, p1, "/index.html") {
+            serve_file(conn, "ui.html", "text/html; charset=utf-8", 0, 1 << 24, b, h);
+        } else { if eqs(r, p0, p1, "/api/status") {
+            status_json(s, b);
+            reply(conn, "200 OK", "application/json", b.p, b.len, h);
+        } else { if starts(r, p1, p0, "/data/") {
+            let qs = &r[q0..q1];
+            let fr = kv(qs, q1 - q0, "from");
+            let from: u64 = 0;
+            if fr.hi > fr.lo { from = num_at(qs, fr.lo, fr.hi); }
+            let cap: u64 = 4194304;
+            let n0 = p0 + 6;
+            if eqs(r, n0, p1, "gaps.tsv") { serve_file(conn, "gaps.tsv", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "FOUND.tsv") { serve_file(conn, "FOUND.tsv", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "VERIFIED.tsv") { serve_file(conn, "VERIFIED.tsv", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "jobs.tsv") { serve_file(conn, "jobs.tsv", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "hunt.log") { serve_file(conn, "hunt.log", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "table.tsv") { serve_file(conn, "table.tsv", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "submitted.txt") { serve_file(conn, "submitted.txt", "text/plain", from, cap, b, h); }
+            else { if eqs(r, n0, p1, "bench.txt") { serve_file(conn, "bench.txt", "text/plain", from, cap, b, h); }
+            else { reply(conn, "404 Not Found", "text/plain", "", 0, h); } } } } } } } }
+        } else { if eqs(r, p0, p1, "/favicon.ico") {
+            reply(conn, "204 No Content", "image/x-icon", "", 0, h);
+        } else {
+            reply(conn, "404 Not Found", "text/plain", "", 0, h);
+        } } } }
+        rt_close_fd(conn);
+        return;
+    }
+    if eqs(r, p0, p1, "/api/start") {
+        let had_table = rt_file_size("records.txt") >= 1000000;
+        if start_hunt(s, body, bl, b) { tick(s, b, t, h); reply_msg(conn, true, "hunt started", b, h); }
+        else { if had_table { reply_msg(conn, false, "a hunt is already running", b, h); }
+               else { start_records(s, b); reply_msg(conn, false, "records.txt is missing: fetching the live table, start again in a minute", b, h); } }
+    } else { if eqs(r, p0, p1, "/api/stop") {
+        if !s.running { reply_msg(conn, false, "nothing is running", b, h); } else {
+            s.stopping = true;
+            let fnow = kv(body, bl, "now");
+            if fnow.hi > fnow.lo && body[fnow.lo] == 49 {
+                let i: u64 = 0;
+                while i < MAXW() { if wv(s, i, 0) != 0 { wset(s, i, 20, 1); rt_kill(i64(wv(s, i, 0)), 15); } i = i + 1; }
+                log_line(b, "stop now: workers killed");
+                reply_msg(conn, true, "stopping now", b, h);
+            } else {
+                log_line(b, "stop requested: finishing the running jobs");
+                reply_msg(conn, true, "stopping after the running jobs finish", b, h);
+            }
+        }
+    } else { if eqs(r, p0, p1, "/api/records") {
+        start_records(s, b);
+        reply_msg(conn, true, "downloading the live record table", b, h);
+    } else { if eqs(r, p0, p1, "/api/verify") {
+        let n = verify_pending(s, b);
+        if n == 0 { reply_msg(conn, true, "everything is already verified", b, h); }
+        else { reply_msg(conn, true, "verifying in the background", b, h); }
+    } else { if eqs(r, p0, p1, "/api/bench") {
+        if s.bench_pid == 0 {
+            bz(b);
+            ps(b, "hunter"); pb(b, 0); ps(b, "bench"); pb(b, 0); ps(b, "4001"); pb(b, 0); ps(b, "210"); pb(b, 0); ps(b, "4096"); pb(b, 0);
+            s.bench_pid = rt_spawn(b.p, 5, 1, "", 0, "bench.txt");
+            s.bench_st = 1;
+        }
+        reply_msg(conn, true, "benchmark running (about a minute)", b, h);
+    } else { if eqs(r, p0, p1, "/api/submitted") {
+        let fg = kv(body, bl, "gap");
+        if fg.hi > fg.lo {
+            bz(b); pu(b, num_at(body, fg.lo, fg.hi)); pb(b, 10);
+            rt_append("submitted.txt", b.p, b.len);
+        }
+        reply_msg(conn, true, "marked as submitted", b, h);
+    } else { if eqs(r, p0, p1, "/api/config") {
+        let fd = kv(body, bl, "discoverer");
+        let dd = slice(s.disc, 16);
+        let k: u64 = 0;
+        let j = fd.lo;
+        while j < fd.hi && k < 8 {
+            let c = body[j];
+            if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || isdig(c) || c == 46 || c == 45 || c == 95 { dd[k] = c; k = k + 1; }
+            j = j + 1;
+        }
+        if k >= 3 {
+            s.dlen = k;
+            rt_write_atomic("config.txt", s.disc, k);
+            reply_msg(conn, true, "saved", b, h);
+        } else { reply_msg(conn, false, "discoverer must be 3-8 letters", b, h); }
+    } else {
+        reply(conn, "404 Not Found", "text/plain", "", 0, h);
+    } } } } } } }
+    rt_close_fd(conn);
+}
+
+fn cmd_serve() -> i32 {
+    rt_server_init();
+    rt_chdir_exe();
+    rt_mkdir("run");
+    let pv = process.env("HUNTER_PORT");
+    let port_s = arg_or(2, "8765");
+    let port_n = parse_num(port_s);
+    match pv { Ok(v) => { port_n = parse_num(v); } Err(e) => {} }
+    if port_n == 0 { port_n = 8765; }
+    let s = Srv {
+        A: rt_alloc64(MAXA() * AS()), na: 0, W: rt_alloc64(MAXW() * WS()), nw: 0,
+        LN: rt_alloc8(MAXW() * LB()), SM: rt_alloc8(MAXW() * 2048), V: rt_alloc64(16),
+        running: false, stopping: false, ends: 0, started: 0, cores: 0,
+        gpu_ok: rt_gpu_available() == 1, gpu_on: false, job_secs: 600, lam: 0, scale: u64(1) << 31, caff: 0,
+        rng: rt_now_ns() ^ (u64(rt_getpid()) << 32) ^ 88172645463325252,
+        rec_pid: 0, rec_st: 0, bench_pid: 0, bench_st: 0,
+        disc: rt_alloc8(16), dlen: 0, ncpu: u64(rt_ncpu()), port: port_n, found: 0,
+    };
+    let dd = slice(s.disc, 16);
+    let dflt: str = "B.Rouyea";
+    let k: u64 = 0;
+    while k < dflt.len { dd[k] = dflt.bytes[k]; k = k + 1; }
+    s.dlen = dflt.len;
+    let cn = rt_read_at("config.txt", 0, s.disc, 8);
+    if cn >= 3 { s.dlen = u64(cn); }
+    let b0 = out_new(0 - 1, 1 << 12);
+    load_state(s);
+    default_arms(s);
+    if rt_file_size("records.txt") <= 0 {
+        io.eprintln("hunter: records.txt is missing -- fetching the live record table now");
+        start_records(s, b0);
+    }
+    let lfd = net.tcp_socket();
+    rt_cloexec(lfd);
+    net.reuse_addr_raw(lfd);
+    if net.bind_v4(lfd, net.loopback_v4(), u16(port_n)) != 0 {
+        io.eprint("hunter: port "); io.println_i64(i64(port_n)); io.eprintln("hunter: could not bind (already running?)");
+        return 1;
+    }
+    net.listen_raw(lfd, 64);
+    let b = out_new(0 - 1, 1 << 16);
+    let t = out_new(0 - 1, 1 << 12);
+    let h = out_new(0 - 1, 1 << 12);
+    let rq = out_new(0 - 1, 1 << 16);
+    let rd = out_new(0 - 1, 1 << 16);
+    io.print("the hunter (praetor) -- control room on http://localhost:");
+    io.println_i64(i64(port_n));
+    if s.gpu_ok { io.print("gpu: "); let gn = rt_gpu_name(); let gs = slice(gn, rt_strlen(gn)); let o = out_new(1, 256); pbs(o, gs, 0, gs.len); pb(o, 10); flush(o); }
+    io.println("ctrl-c stops everything (running jobs are killed, records already found are safe in FOUND.tsv)");
+    log_line(b, "control room started");
+    if rt_is_darwin() == 1 {
+        let no = process.env("HUNTER_NO_OPEN");
+        let open_it = true;
+        match no { Ok(v) => { open_it = false; } Err(e) => {} }
+        if open_it {
+            bz(b);
+            ps(b, "open"); pb(b, 0); ps(b, "http://localhost:"); pu(b, port_n); pb(b, 0);
+            let op = rt_spawn(b.p, 2, 0, "", 0, "/dev/null");
+            rt_reap(op);
+        }
+    }
+    let last: u64 = 0;
+    while rt_quit_requested() == 0 {
+        let conn = rt_accept_ms(lfd, 200);
+        if conn >= 0 { http_handle(s, conn, rq, b, h, t); }
+        let now = rt_now_ns();
+        if now - last > 200000000 { tick(s, b, t, rd); last = now; }
+    }
+    // ctrl-c: the terminal already signalled the workers (same process group); drain what they wrote
+    let i: u64 = 0;
+    while i < MAXW() { if wv(s, i, 0) != 0 { wset(s, i, 20, 1); rt_kill(i64(wv(s, i, 0)), 15); } i = i + 1; }
+    rt_sleep_ms(300);
+    i = 0;
+    while i < MAXW() {
+        if wv(s, i, 0) != 0 { pump(s, i, b, t, rd); let st = rt_reap(i64(wv(s, i, 0))); finish(s, i, st, b, t); }
+        i = i + 1;
+    }
+    if s.caff > 0 { rt_kill(s.caff, 15); }
+    save_state(s, b);
+    log_line(b, "control room stopped");
+    io.println("bye. state saved.");
+    return 0;
+}
+
+// ---------------------------------------------------------------- verify: an independent check
+// hunter verify "m*P#/d-a" gap   ->  BPSW-style checks on both ends + nextprime(p) == p + gap
+fn cmd_verify() -> i32 {
+    let ex = arg_or(2, "");
+    let gap = parse_num(arg_or(3, "0"));
+    let e = ex.bytes;
+    let m = num_at(e, 0, e.len);
+    let i = skip_digits(e, 0) + 1;                  // past '*'
+    let P = num_at(e, i, e.len);
+    i = skip_digits(e, i) + 2;                      // past '#/'
+    let d = num_at(e, i, e.len);
+    i = skip_digits(e, i) + 1;                      // past '-'
+    let a = num_at(e, i, e.len);
+    let o = out_new(1, 4096);
+    if m == 0 || P == 0 || d == 0 || gap == 0 { ps(o, "usage: hunter verify m*P#/d-a gap\n"); flush(o); return 1; }
+    let p = rt_mpz(); let q = rt_mpz(); let np = rt_mpz();
+    __gmpz_primorial_ui(p, P);
+    __gmpz_mul_ui(p, p, m);
+    let ok = __gmpz_divisible_ui_p(p, d) != 0;
+    if ok {
+        __gmpz_divexact_ui(p, p, d);
+        __gmpz_sub_ui(p, p, a);
+        __gmpz_add_ui(q, p, gap);
+        ok = __gmpz_probab_prime_p(p, 25) != 0 && __gmpz_probab_prime_p(q, 25) != 0;
+        if ok { __gmpz_nextprime(np, p); ok = __gmpz_cmp(np, q) == 0; }
+    }
+    let b = out_new(0 - 1, 512);
+    pu(b, gap); ps(b, "\t-\t"); pbs(b, e, 0, e.len); tab(b);
+    if ok { ps(b, "OK\n"); } else { ps(b, "FAILED\n"); }
+    rt_append("VERIFIED.tsv", b.p, b.len);
+    pbs(o, slice(b.p, b.cap), 0, b.len);
+    flush(o);
+    if ok { return 0; }
+    return 2;
+}
+
+fn main() -> i32 {
+    let cmd = arg_or(1, "serve");
+    if cmd == "serve" { return cmd_serve(); }
+    if cmd == "hunt" { return cmd_hunt(); }
+    if cmd == "bench" { return cmd_bench(); }
+    if cmd == "verify" { return cmd_verify(); }
+    io.println("the hunter (praetor)");
+    io.println("  hunter                        the control room on http://localhost:8765 (same as: hunter serve)");
+    io.println("  hunter serve [port]");
+    io.println("  hunter bench [P d count]      cpu vs gpu prime-test throughput, and a math check against gmp");
+    io.println("  hunter verify m*P#/d-a gap    independent check of one gap");
+    io.println("  hunter hunt P d m0 M SL L lambda mcal records.txt    one engine job (what the workers run)");
+    return 0;
+}
