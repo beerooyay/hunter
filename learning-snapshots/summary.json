@@ -1,0 +1,275 @@
+{
+  "version": "target-learner-v1",
+  "updated": 1793475011.2721508,
+  "pid": 1249,
+  "status": "running",
+  "phase": "round 26: 4001#/2310, merit 40, modeled yield per elapsed hour",
+  "lanes": {
+    "control": {
+      "tested": 24,
+      "completed": 24,
+      "best": 8.090946498490158,
+      "observed": {
+        "5": 7,
+        "10": 0,
+        "15": 0,
+        "20": 0,
+        "25": 0,
+        "30": 0,
+        "40": 0,
+        "50": 0
+      },
+      "predicted": {
+        "5": 6.747331176798436,
+        "10": 1.099517432544995,
+        "15": 0.09953710850558187,
+        "20": 0.005496241135176082,
+        "25": 0.00020529256020995255,
+        "30": 5.7043861427588525e-06,
+        "40": 2.2358919140160895e-09,
+        "50": 4.2244518724744403e-13
+      }
+    },
+    "aimed": {
+      "tested": 72,
+      "completed": 72,
+      "best": 13.350654026081566,
+      "observed": {
+        "5": 15,
+        "10": 1,
+        "15": 0,
+        "20": 0,
+        "25": 0,
+        "30": 0,
+        "40": 0,
+        "50": 0
+      },
+      "predicted": {
+        "5": 20.85807848798808,
+        "10": 3.5366159874487404,
+        "15": 0.3340567037241767,
+        "20": 0.019264342868653767,
+        "25": 0.0007496990521778957,
+        "30": 2.13308254886561e-05,
+        "40": 8.632094338839719e-09,
+        "50": 1.697158397510271e-12
+      }
+    }
+  },
+  "arms": {
+    "337#/210": {
+      "rows": 16,
+      "trials": 287,
+      "successes": 32,
+      "expected_successes": 24.751547060260965,
+      "observed_over_expected": 1.2928484802219313,
+      "fitted_scale": 1.05,
+      "research_scale": 1.0,
+      "train_successes": 28,
+      "holdout_successes": 4,
+      "holdout_gain_nats": -0.04129659979758672,
+      "gate_passed": false
+    },
+    "337#/2310": {
+      "rows": 12,
+      "trials": 188,
+      "successes": 24,
+      "expected_successes": 16.322294322383296,
+      "observed_over_expected": 1.4703815239434823,
+      "fitted_scale": 1.05,
+      "research_scale": 1.0,
+      "train_successes": 20,
+      "holdout_successes": 4,
+      "holdout_gain_nats": -0.010209452175229283,
+      "gate_passed": false
+    },
+    "1439#/210": {
+      "rows": 12,
+      "trials": 1493,
+      "successes": 24,
+      "expected_successes": 30.53082406969297,
+      "observed_over_expected": 0.7860908026987742,
+      "fitted_scale": 0.95,
+      "research_scale": 1.0,
+      "train_successes": 16,
+      "holdout_successes": 8,
+      "holdout_gain_nats": 0.06538787740486227,
+      "gate_passed": false
+    },
+    "1439#/2310": {
+      "rows": 24,
+      "trials": 1979,
+      "successes": 48,
+      "expected_successes": 40.55046885968844,
+      "observed_over_expected": 1.1837101111232082,
+      "fitted_scale": 1.05,
+      "research_scale": 1.0,
+      "train_successes": 40,
+      "holdout_successes": 8,
+      "holdout_gain_nats": 0.10154528367796363,
+      "gate_passed": false
+    },
+    "4001#/210": {
+      "rows": 20,
+      "trials": 4809,
+      "successes": 40,
+      "expected_successes": 35.0364468100887,
+      "observed_over_expected": 1.1416682809422916,
+      "fitted_scale": 1.05,
+      "research_scale": 1.0,
+      "train_successes": 26,
+      "holdout_successes": 14,
+      "holdout_gain_nats": 0.04637276333595255,
+      "gate_passed": false
+    },
+    "4001#/2310": {
+      "rows": 12,
+      "trials": 2483,
+      "successes": 24,
+      "expected_successes": 18.097506279325504,
+      "observed_over_expected": 1.3261495605843483,
+      "fitted_scale": 1.05,
+      "research_scale": 1.0,
+      "train_successes": 18,
+      "holdout_successes": 6,
+      "holdout_gain_nats": 0.01916764830219081,
+      "gate_passed": false
+    }
+  },
+  "recipes": [
+    {
+      "target": 30,
+      "P": 337,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 0.5478075720000106
+    },
+    {
+      "target": 30,
+      "P": 337,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 0.5875504390000117
+    },
+    {
+      "target": 30,
+      "P": 1439,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 3.50187482299998
+    },
+    {
+      "target": 30,
+      "P": 1439,
+      "d": 2310,
+      "rounds": 3,
+      "seconds": 6.273952588000043
+    },
+    {
+      "target": 30,
+      "P": 4001,
+      "d": 210,
+      "rounds": 2,
+      "seconds": 97.048383629
+    },
+    {
+      "target": 30,
+      "P": 4001,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 47.54259572699999
+    },
+    {
+      "target": 40,
+      "P": 337,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 0.6402937430000293
+    },
+    {
+      "target": 40,
+      "P": 337,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 0.6885237220000135
+    },
+    {
+      "target": 40,
+      "P": 1439,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 2.3853199210000184
+    },
+    {
+      "target": 40,
+      "P": 1439,
+      "d": 2310,
+      "rounds": 2,
+      "seconds": 4.252326309999944
+    },
+    {
+      "target": 40,
+      "P": 4001,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 61.010357595000016
+    },
+    {
+      "target": 40,
+      "P": 4001,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 30.52794561899998
+    },
+    {
+      "target": 50,
+      "P": 337,
+      "d": 210,
+      "rounds": 2,
+      "seconds": 1.4609268469998824
+    },
+    {
+      "target": 50,
+      "P": 337,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 0.6703720109999836
+    },
+    {
+      "target": 50,
+      "P": 1439,
+      "d": 210,
+      "rounds": 1,
+      "seconds": 2.624861992000035
+    },
+    {
+      "target": 50,
+      "P": 1439,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 2.5681460189999825
+    },
+    {
+      "target": 50,
+      "P": 4001,
+      "d": 210,
+      "rounds": 2,
+      "seconds": 106.50702757699997
+    },
+    {
+      "target": 50,
+      "P": 4001,
+      "d": 2310,
+      "rounds": 1,
+      "seconds": 57.08323422400002
+    }
+  ],
+  "jobs": 26,
+  "records": 0,
+  "verified_targets": {
+    "30": 0,
+    "40": 0,
+    "50": 0
+  },
+  "note": "Adaptive model, not a neural network. Merit 30-50 predictions are unvalidated. Controls are random within the same refined windows; not a global random-search benchmark."
+}
