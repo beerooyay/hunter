@@ -17,6 +17,7 @@ merits.tmp
 records.bak
 *.tmp
 # python fallback build/runtime files
+__pycache__/
 python-v3/hunt
 python-v3/*.tsv
 python-v3/*.json
@@ -27,3 +28,4 @@ python-v3/records.txt
 .DS_Store
 *.ll
 *.o
+/learning/

@@ -1,5 +1,60 @@
 # the hunter
 
+## persistent learning and merit 30–50 research
+
+The ordinary scheduler reloads its learned state across restarts. A separate
+`python3 research.py` worker now learns target-specific search recipes, retains
+trial data and survivor patterns in SQLite, and compares ranked candidates with
+random controls. Open `/research` for its dashboard. See
+[persistent-learning.md](docs/persistent-learning.md) for calibration, restart,
+backup, and free-hosting details. This is experimental; higher yield and
+extreme-merit discoveries are not guaranteed.
+
+## target-merit experiments
+
+`python3 moon.py` runs a separate, reproducible ten-minute target-first experiment
+(requires gmpy2). Defaults are a goal of 50 distinct gap-table improvements and a
+target merit of 50; neither is a promised result. One low-priority worker scouts
+256 multipliers using the Praetor sieve, aims a deeper 64-multiplier sieve around
+the best model-ranked location, and tests its strongest candidates using BPSW.
+One randomly chosen coarse-window candidate per round is tested as a labeled
+control; this compares the whole aim-and-refine pipeline with coarse random choice,
+not just the ranking in isolation. Controls can also produce legitimate finds.
+Candidates alternate between P=337/1439 and d=210/2310. Ranking uses log model
+probability per estimated CPU time, not the ordinary fixed-point table learner.
+Timing estimates are noisy and the independent-survivor tail is uncalibrated.
+This is an experimental composition of known methods, not a claimed new theorem.
+
+Outputs live in a fresh `build/moon-*` directory: a record-table snapshot,
+gzip-compressed replayable survivor patterns, tested-candidate JSONL, checkpointed summary, and
+`found.tsv` containing only independently rechecked local table improvements.
+Repeated improvements of the same gap count once. Target hits are counted
+separately. Endpoint and next-prime checks are probable-prime verification, not
+primality certificates. There are no network calls or submissions.
+The supervisor terminates the experiment process group at its wall-clock budget;
+counts after forced termination reflect the last checkpoint. Touch `STOP` inside
+that run's output folder to request a cooperative stop.
+
+For a short check: `python3 moon.py --seconds 15 --keep 1`.
+To replay: retain the seed and record snapshot; CPU timing noise can change ranks.
+Run `python3 rt/mooncheck.py` and compile/run `rt/test_probe.c` for regression checks.
+
+The tools panel has a bounded target-merit probe for P=337, 1439, and 4001.
+It uses the Praetor sieve and a C log-sum-exp scorer to estimate the probability
+that both nearest endpoints lie inside the window and their gap reaches the target.
+The independent-survivor model is not calibrated at merit 43. These are predictions,
+not observed hits or certified gaps. Normal hunting still optimizes table improvements;
+the probe does not feed tiny probabilities into the fixed-point learner.
+
+`./hunter probe [P d count target start sieve]` defaults to
+`337 210 64 43 10000001 1000000`. Set `HUNTER_PATTERNS=1` to emit survivor offsets.
+Count includes multipliers
+excluded by gcd(m,d), so fewer rows are printed. Log10 probabilities remain readable
+below ordinary probability underflow. The estimated per-core rate uses three local
+primality timing samples and excludes setup/sieve costs; it is an exploratory ranking,
+not an equal-budget measured hunt or a GPU forecast. Probe output shares the benchmark
+panel. Tools and hunts cannot start over one another.
+
 A prime gap record hunter written in [Praetor](https://github.com/ceeboozwah/Praetor), with an Apple GPU (Metal) path.
 One program: `./hunter` starts the control room in your browser, and the control room runs the hunt.
 
@@ -16,12 +71,13 @@ A *prime gap* is the run of composites between two consecutive primes. The recor
 2. **Sieve.** For each center it removes every neighbour with a prime factor below 10^9, using a
    combined sieve plus a Euclid-style modular search for the large primes.
 3. **Score.** A survivor is prime with probability q = 1 / (ln N · ∏(1 − 1/p)). On real data this model
-   is calibrated to about 1% (the dashboard re-checks it live). From the survivor lists the hunter computes
-   the exact probability that a center holds a record.
+   has shown close aggregate agreement on well-sampled families (the dashboard re-checks it live).
+   From survivor lists it computes record probabilities under an independent-survivor model;
+   aggregate agreement does not establish extreme-tail calibration.
 4. **Test, but only where it pays.** Each center is tested only if its expected value beats λ × its cost,
    and the left side is searched only if the right side left it worth finishing (the stopping rule).
 5. **Learn where to look.** A Thompson-sampling learner over (P, d) prices every arm with a cheap
-   sieve-only dry run, then shifts the cores toward whatever is actually producing records per core-hour.
+   sieve-only dry run, then shifts cores using modeled record yield per measured CPU-hour.
 6. **Verify.** Every record is re-checked by an independent program (`hunter verify`: BPSW-style tests on
    both ends and GMP's `nextprime`) before you submit it.
 

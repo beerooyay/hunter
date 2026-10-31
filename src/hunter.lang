@@ -18,6 +18,7 @@ import std.thread;
 
 // ---------------------------------------------------------------- FFI
 extern fn mml_fd_write(fd: i32, buf: *const void, n: u64) -> i64;
+extern fn rt_survivors(bits: *u64, start: u64, limit: u64, out: *u32) -> u64;
 extern fn rt_now_ns() -> u64;
 extern fn rt_cpu_ns() -> u64;
 extern fn rt_unix_s() -> u64;
@@ -937,6 +938,31 @@ fn run_engine(write c: Ctx, write o: Out) {
     let imp = slice(c.imp, 2 * c.SL + 4);
     let ONE = one62();
     let SL = c.SL;
+    // A fixed gap can only cease improving as ln(N) increases. Cache every
+    // invariant decision over this job; only endpoint disagreements need work.
+    // HUNT_MASK_REFERENCE retains the full scan for differential validation.
+    let mask_reference = false;
+    match process.env("HUNT_MASK_REFERENCE") { Ok(v) => { mask_reference = true; } Err(e) => {} }
+    let changing_ptr = rt_alloc32(2 * SL + 4);
+    let changing = slice(changing_ptr, 2 * SL + 4);
+    let nchanging: u64 = 0;
+    let G0: u64 = 0;
+    if !mask_reference && c.M > 0 {
+        let mask_start = rt_now_ns();
+        let ln_first = c.lnK + ln_q32(c.m0);
+        let ln_last = c.lnK + ln_q32(c.m0 + c.M - 1);
+        let g: u64 = 0;
+        while g <= 2 * SL + 1 {
+            let first = improves(rec, c.recmax, g, ln_first);
+            let last = improves(rec, c.recmax, g, ln_last);
+            if first { imp[g] = 1; } else { imp[g] = 0; }
+            if (first && !last) || (!first && last) { changing[nchanging] = u32(g); nchanging = nchanging + 1; }
+            if first && G0 == 0 && g >= 2 && (g & 1) == 0 { G0 = g; }
+            g = g + 1;
+        }
+        if G0 == 0 { G0 = 2 * SL; }
+        c.t_score = c.t_score + (rt_now_ns() - mask_start);
+    }
     let G: u64 = 1;
     if c.gpu == 2 { G = 64; }      // cpu reference wavefront (validation)
     if c.gpu == 1 { G = 256; }     // metal: 256 centers x 16 survivors = 4096 tests per dispatch fills an M-series gpu
@@ -960,11 +986,16 @@ fn run_engine(write c: Ctx, write o: Out) {
             let lf = rt + c.words;
             let nR: u64 = 0;
             let nL: u64 = 0;
+            if mask_reference {
             let off: u64 = 1;
             while off <= SL {
                 if ((bits[rt + (off >> 6)] >> (off & 63)) & 1) == 0 { R[nR] = u32(off); nR = nR + 1; }
                 if ((bits[lf + (off >> 6)] >> (off & 63)) & 1) == 0 { Lf[nL] = u32(off); nL = nL + 1; }
                 off = off + 1;
+            }
+            } else {
+                nR = rt_survivors(c.bits, rt, SL, c.R);
+                nL = rt_survivors(c.bits, lf, SL, c.Lf);
             }
             let lnN = c.lnK + ln_q32(m);
             let D = mulsh(lnN, c.lprod, 62);              // lnN * prod, Q32
@@ -976,13 +1007,23 @@ fn run_engine(write c: Ctx, write o: Out) {
             let j: u64 = 1;
             while j <= nmax { pw[j] = mq(pw[j - 1], omq); j = j + 1; }
             // which gap sizes would beat the table at this ln N
-            let G0: u64 = 0;
-            let g: u64 = 0;
-            while g <= 2 * SL + 1 {
-                if improves(rec, c.recmax, g, lnN) { imp[g] = 1; if G0 == 0 && g >= 2 && (g & 1) == 0 { G0 = g; } } else { imp[g] = 0; }
-                g = g + 1;
+            if mask_reference {
+                G0 = 0;
+                let g: u64 = 0;
+                while g <= 2 * SL + 1 {
+                    if improves(rec, c.recmax, g, lnN) { imp[g] = 1; if G0 == 0 && g >= 2 && (g & 1) == 0 { G0 = g; } } else { imp[g] = 0; }
+                    g = g + 1;
+                }
+                if G0 == 0 { G0 = 2 * SL; }
+            } else {
+                let ci: u64 = 0;
+                while ci < nchanging {
+                    let g = u64(changing[ci]);
+                    if improves(rec, c.recmax, g, lnN) { imp[g] = 1; } else { imp[g] = 0; }
+                    ci = ci + 1;
+                }
+                while G0 < 2 * SL && imp[G0] == 0 { G0 = G0 + 2; }
             }
-            if G0 == 0 { G0 = 2 * SL; }
             // cntL[x] = #left survivors with offset < x
             let jj: u64 = 0;
             let x: u64 = 0;
@@ -1169,6 +1210,7 @@ fn run_engine(write c: Ctx, write o: Out) {
         b0 = b0 + mb;
     }
     if c.gpu != 0 { grp_run(c, grp, o); }
+    rt_free(changing_ptr);
     let tt = rt_now_ns() - t0 + c.t_pre;
     // summary line (same keys as the C engine)
     ps(o, "#\tP="); pu(o, c.P); ps(o, "\td="); pu(o, c.d); ps(o, "\tm0="); pu(o, c.m0);
@@ -1551,7 +1593,7 @@ fn rng(write s: Srv) -> u64 {
 //   9 completed  10 hits  11 candidates  12 predicted-calibration(Q40)  13 calibration hits
 //   14 ns per m  15 priced (0 no, 1 pricing, 2 yes)  16 in current set  17 n logs
 //   18 gpu jobs  19 gpu wall ns  20 gpu value(Q40)  21 gpu tested  22 gpu hits  23 SL  24 digits
-//   25..64 last 40 log-rates (i64 bits, ring)
+//   25..64 last 40 log-rates (i64 bits, ring); 65 bounded cold-start attempts
 // worker slot (32 u64 fields):
 //   0 pid  1 arm  2 m0  3 M  4 dry  5 gpu  6 started  7 tested  8 out fd  9 last gap  10 last merit(Q32)
 //   11 last completed  12 dry value(Q50)  13 dry cost(Q32 s)  14 calibration prediction(Q40)
@@ -1667,8 +1709,8 @@ fn price_scale(write s: Srv) -> u64 {
     return r[n / 2];
 }
 struct Post { mu: i64, v: u64 }
-// log-normal posterior on an arm's rate: the dry-run price is a trusted prior (the survivor model is
-// calibrated to ~1%), real jobs refine it. same constants as brain.py.
+// Log-normal posterior on modeled yield per CPU-hour, not measured record frequency.
+// Aggregate survivor calibration does not establish extreme-tail calibration.
 fn posterior(write s: Srv, i: u64, scale: u64) -> Post {
     let mu0: i64 = 0 - 24167014037;                  // ln(3.6e-3 per core-hour)
     let var0: u64 = u64(16) << 32;
@@ -1743,14 +1785,41 @@ fn choose(write s: Srv, allow_dry: bool) -> u64 {
             i = i + 1;
         }
     }
+    // An arm with no tested centers needs a bounded, unfiltered first sample.
+    // Do not launch duplicate cold-start jobs while one is already in flight.
+    if allow_dry {
+        i = 0;
+        while i < s.na {
+            if av(s, i, 16) == 1 && av(s, i, 15) == 2 && av(s, i, 8) == 0 && av(s, i, 65) < 2 {
+                let occupied = false;
+                let w: u64 = 0;
+                while w < MAXW() {
+                    if wv(s, w, 0) != 0 && wv(s, w, 1) == i { occupied = true; }
+                    w = w + 1;
+                }
+                if !occupied { return i; }
+            }
+            i = i + 1;
+        }
+    }
     let sc = price_scale(s);
     let best: u64 = MAXA();
     let bd: i64 = 0;
     i = 0;
     while i < s.na {
-        if av(s, i, 16) == 1 {
+        if av(s, i, 16) == 1 && (!allow_dry || av(s, i, 8) > 0 || av(s, i, 65) >= 2) {
+            let occupied = false;
+            if allow_dry && av(s, i, 8) == 0 {
+                let w: u64 = 0;
+                while w < MAXW() {
+                    if wv(s, w, 0) != 0 && wv(s, w, 1) == i { occupied = true; }
+                    w = w + 1;
+                }
+            }
+            if !occupied {
             let d = draw(s, i, sc);
             if best == MAXA() || d > bd { best = i; bd = d; }
+            }
         }
         i = i + 1;
     }
@@ -1814,6 +1883,8 @@ fn load_state(write s: Srv) {
                 }
                 if av(s, a, 15) == 1 { aset(s, a, 15, 0); }  // a pricing run that never finished
                 aset(s, a, 16, 0);
+                // Migrate only empty histories; retain counters and multiplier reservations.
+                if av(s, a, 8) == 0 && av(s, a, 5) == 0 { aset(s, a, 17, 0); }
             }
         }
         i = e + 1;
@@ -2058,12 +2129,15 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
         if M < 20 { M = 20; }
     }
     let m0 = av(s, ar, 3);
+    let job_lam = s.lam;
+    let cold = !dry && !isgpu && av(s, ar, 8) == 0 && av(s, ar, 65) < 2;
+    if cold { M = 20; job_lam = 0; }
     aset(s, ar, 3, m0 + M + (M & 1));
     bz(b);
     ps(b, "hunter"); pb(b, 0); ps(b, "hunt"); pb(b, 0);
     pu(b, P); pb(b, 0); pu(b, d); pb(b, 0); pu(b, m0); pb(b, 0); pu(b, M); pb(b, 0);
     pu(b, av(s, ar, 23)); pb(b, 0); ps(b, "1e9"); pb(b, 0);
-    psci(b, muldiv(s.lam, u64(1) << 22, 3600), 62, 6); pb(b, 0);
+    psci(b, muldiv(job_lam, u64(1) << 22, 3600), 62, 6); pb(b, 0);
     ps(b, "15"); pb(b, 0); ps(b, "records.txt"); pb(b, 0);
     bz(t);
     if dry { ps(t, "HUNT_DRY=1"); pb(t, 0); }
@@ -2085,6 +2159,7 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
         return;
     }
     let fails = wv(s, i, 21);
+    if cold { aadd(s, ar, 65, 1); }
     let k: u64 = 0;
     while k < WS() { wset(s, i, k, 0); k = k + 1; }
     wset(s, i, 21, fails);
@@ -2093,8 +2168,10 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     if isgpu { wset(s, i, 5, 1); }
     wset(s, i, 6, rt_unix_s());
     wset(s, i, 8, u64(fd + 1));
-    let lam_now = s.lam;
+    let lam_now = job_lam;
     wset(s, i, 16, lam_now);
+    // Persist reservations and cold-start attempts promptly, including across restarts.
+    save_state(s, t);
 }
 
 fn busy(write s: Srv) -> u64 {
@@ -2374,7 +2451,7 @@ fn default_arms(write s: Srv) {
 }
 
 fn start_hunt(write s: Srv, body: slice u8, n: u64, write b: Out) -> bool {
-    if s.running { return false; }
+    if s.running || s.bench_pid != 0 { return false; }
     if rt_file_size("records.txt") < 1000000 { return false; }
     let fc = kv(body, n, "cores");
     let fh = kv(body, n, "hours");
@@ -2518,6 +2595,18 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
     if p1 < hend && r[p1] == 63 { q0 = p1 + 1; q1 = q0; while q1 < hend && r[q1] != 32 { q1 = q1 + 1; } }
     let body = &r[hend..rq.cap];
     let bl = rq.len - hend;
+    if !post && eqs(r, p0, p1, "/research") {
+        serve_file(conn, "research.html", "text/html; charset=utf-8", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
+    if !post && eqs(r, p0, p1, "/research.json") {
+        serve_file(conn, "learning/summary.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
+    if !post && eqs(r, p0, p1, "/calibration.json") {
+        serve_file(conn, "learning/calibration.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
     if !post {
         if eqs(r, p0, p1, "/") || eqs(r, p0, p1, "/index.html") {
             serve_file(conn, "ui.html", "text/html; charset=utf-8", 0, 1 << 24, b, h);
@@ -2575,13 +2664,36 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
         if n == 0 { reply_msg(conn, true, "everything is already verified", b, h); }
         else { reply_msg(conn, true, "verifying in the background", b, h); }
     } else { if eqs(r, p0, p1, "/api/bench") {
+        let probe = kv(body, bl, "probe");
+        if s.running || s.bench_pid != 0 {
+            reply_msg(conn, false, "stop the hunt or wait for the current tool to finish", b, h);
+            rt_close_fd(conn);
+            return;
+        }
         if s.bench_pid == 0 {
             bz(b);
-            ps(b, "hunter"); pb(b, 0); ps(b, "bench"); pb(b, 0); ps(b, "4001"); pb(b, 0); ps(b, "210"); pb(b, 0); ps(b, "4096"); pb(b, 0);
-            s.bench_pid = rt_spawn(b.p, 5, 1, "", 0, "bench.txt");
+            ps(b, "hunter"); pb(b, 0);
+            let argc: i32 = 5;
+            if probe.hi > probe.lo {
+                let fp = kv(body, bl, "P");
+                let ft = kv(body, bl, "target");
+                let P = num_at(body, fp.lo, fp.hi);
+                let target = num_at(body, ft.lo, ft.hi);
+                if P < 211 || P > 4001 || target < 1 || target > 100 {
+                    reply_msg(conn, false, "choose P 211..4001 and target 1..100", b, h);
+                    rt_close_fd(conn); return;
+                }
+                ps(b, "probe"); pb(b, 0); pu(b, P); pb(b, 0);
+                ps(b, "210"); pb(b, 0); ps(b, "64"); pb(b, 0); pu(b, target); pb(b, 0);
+                argc = 6;
+            } else {
+                ps(b, "bench"); pb(b, 0); ps(b, "4001"); pb(b, 0); ps(b, "210"); pb(b, 0); ps(b, "4096"); pb(b, 0);
+            }
+            s.bench_pid = rt_spawn(b.p, argc, 1, "", 0, "bench.txt");
+            if s.bench_pid <= 0 { s.bench_pid = 0; reply_msg(conn, false, "could not start tool", b, h); rt_close_fd(conn); return; }
             s.bench_st = 1;
         }
-        reply_msg(conn, true, "benchmark running (about a minute)", b, h);
+        reply_msg(conn, true, "tool started; output appears below", b, h);
     } else { if eqs(r, p0, p1, "/api/submitted") {
         let fg = kv(body, bl, "gap");
         if fg.hi > fg.lo {
@@ -2730,11 +2842,76 @@ fn cmd_verify() -> i32 {
     return 2;
 }
 
+extern fn rt_probe(m: u64, q: u64, ln: u64, target: u64, right: *u32, nr: u64, left: *u32, nl: u64, nanos: u64);
+extern fn rt_pattern(m: u64, right: *u32, nr: u64, left: *u32, nl: u64);
+
+fn cmd_probe() -> i32 {
+    let c = new_ctx();
+    c.P = parse_num(arg_or(2, "337"));
+    c.d = parse_num(arg_or(3, "210"));
+    c.M = parse_num(arg_or(4, "64"));
+    let target = parse_num(arg_or(5, "43"));
+    if c.P < 211 || c.P > 4001 || c.d < 1 || c.M < 1 || c.M > 256 || target < 1 || target > 100 {
+        io.eprintln("probe: P 211..4001, d dividing P#, centers 1..256, merit 1..100");
+        return 1;
+    }
+    c.m0 = parse_num(arg_or(6, "10000001"));
+    c.L = parse_num(arg_or(7, "1000000"));
+    if c.m0 < 1 || c.m0 > 1000000000000 || c.L < c.P || c.L > 10000000 {
+        io.eprintln("probe: start 1..1000000000000, sieve P..10000000");
+        return 1;
+    }
+    let patterns = false;
+    let pv = process.env("HUNTER_PATTERNS");
+    match pv { Ok(v) => { patterns = v == "1"; } Err(e) => {} }
+    c.SL = target * c.P;
+    engine_setup(c, "records.txt");
+    let o = out_new(1, 4096);
+    ps(o, "target-merit probe: model estimates, not a hunt\nP="); pu(o, c.P);
+    ps(o, " d="); pu(o, c.d); ps(o, " target="); pu(o, target);
+    ps(o, " sieve="); pu(o, c.L); pb(o, 10);
+    ps(o, "log10 probability: -12 means one in a trillion under the model.\n");
+    ps(o, "rate excludes sieve/setup costs and assumes both sides tested on one CPU core.\n");
+    ps(o, "finite-window endpoints only; no claim of calibration at this target.\n");
+    ps(o, "m\tlog10(probability)\texpected tests\tlog10(hits/CPU-hour)\n");
+    flush(o);
+    let right = slice(c.R, c.SL + 2);
+    let left = slice(c.Lf, c.SL + 2);
+    let b: u64 = 0;
+    while b < c.M {
+        let count = c.M - b; if count > c.MB { count = c.MB; }
+        sieve_block(c, c.m0 + b, count);
+        let bits = slice(c.bits, count * 2 * c.words);
+        let k: u64 = 0;
+        while k < count {
+            let m = c.m0 + b + k;
+            if gcd64(m, c.d) == 1 {
+                let nr: u64 = 0; let nl: u64 = 0; let off: u64 = 1;
+                while off <= c.SL {
+                    let base = k * 2 * c.words;
+                    if ((bits[base + (off >> 6)] >> (off & 63)) & 1) == 0 { right[nr] = u32(off); nr = nr + 1; }
+                    if ((bits[base + c.words + (off >> 6)] >> (off & 63)) & 1) == 0 { left[nl] = u32(off); nl = nl + 1; }
+                    off = off + 1;
+                }
+                let ln = c.lnK + ln_q32(m);
+                let q = divpow2(94, mulsh(ln, c.lprod, 62));
+                rt_probe(m, q, ln, target, c.R, nr, c.Lf, nl, c.tprp);
+                if patterns { rt_pattern(m, c.R, nr, c.Lf, nl); }
+            }
+            k = k + 1;
+        }
+        b = b + count;
+    }
+    io.println("probe complete; no hunt started and no finds written");
+    return 0;
+}
+
 fn main() -> i32 {
     let cmd = arg_or(1, "serve");
     if cmd == "serve" { return cmd_serve(); }
     if cmd == "hunt" { return cmd_hunt(); }
     if cmd == "bench" { return cmd_bench(); }
+    if cmd == "probe" { return cmd_probe(); }
     if cmd == "verify" { return cmd_verify(); }
     io.println("the hunter (praetor)");
     io.println("  hunter                        the control room on http://localhost:8765 (same as: hunter serve)");

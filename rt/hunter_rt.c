@@ -9,6 +9,7 @@
 //     Montgomery algorithm the Metal kernel runs, so the GPU math can be validated on any
 //     machine. On macOS with -DHUNTER_METAL the real GPU path lives in hunter_metal.m.
 #include <stdint.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -324,3 +325,58 @@ uint64_t rt_date(char *buf) {      // local "YYYY-MM-DD HH:MM"
     return (uint64_t)strftime(buf, 32, "%Y-%m-%d %H:%M", &tm);
 }
 void rt_sleep_ms(int ms) { usleep((useconds_t)ms * 1000); }
+
+/* Finite-window model: both nearest prime endpoints must be in the sieve. */
+double rt_logtarget(double q, uint64_t gap, const uint32_t *right, uint64_t nr,
+                    const uint32_t *left, uint64_t nl) {
+    if (!(q > 0 && q < 1)) return NAN;
+    double loss = log1p(-q), total = -INFINITY;
+    for (uint64_t i = 0; i < nr; ++i) {
+        uint64_t lo = 0, hi = nl;
+        int64_t need = (int64_t)gap - right[i];
+        while (lo < hi) {
+            uint64_t mid = lo + (hi - lo) / 2;
+            if ((int64_t)left[mid] < need) lo = mid + 1; else hi = mid;
+        }
+        if (lo == nl) continue;
+        double term = log(q) + i * loss + lo * loss
+                    + log(-expm1((nl - lo) * loss));
+        if (!isfinite(total)) total = term;
+        else {
+            double top = fmax(total, term);
+            total = top + log1p(exp(fmin(total, term) - top));
+        }
+    }
+    return total;
+}
+
+void rt_probe(uint64_t m, uint64_t q62, uint64_t ln32, uint64_t target,
+              const uint32_t *right, uint64_t nr, const uint32_t *left,
+              uint64_t nl, uint64_t nanos) {
+    double q = ldexp((double)q62, -62), ln = ldexp((double)ln32, -32);
+    double total = rt_logtarget(q, (uint64_t)ceil(target * ln), right, nr, left, nl);
+    double loss = log1p(-q);
+    double tests = (-expm1(nr * loss) - expm1(nl * loss)) / q;
+    double seconds = tests * nanos / 1e9;
+    printf("%llu\t%.9f\t%.6f\t%.9f\n", (unsigned long long)m,
+           total / log(10.0), tests,
+           seconds > 0 ? (total + log(3600 / seconds)) / log(10.0) : -INFINITY);
+    if (getenv("HUNTER_PATTERNS") && !strcmp(getenv("HUNTER_PATTERNS"), "1"))
+        printf("@meta\t%llu\t%.17g\t%.17g\n", (unsigned long long)m, q, ln);
+    fflush(stdout);
+}
+
+void rt_pattern(uint64_t m, const uint32_t *right, uint64_t nr,
+                const uint32_t *left, uint64_t nl) {
+    printf("@\t%llu\t", (unsigned long long)m);
+    for (uint64_t i = 0; i < nr; ++i) printf("%s%u", i ? "," : "", right[i]);
+    putchar('\t');
+    for (uint64_t i = 0; i < nl; ++i) printf("%s%u", i ? "," : "", left[i]);
+    putchar('\n');
+    fflush(stdout);
+}
+
+#include "survivors.h"
+uint64_t rt_survivors(const uint64_t *bits, uint64_t start, uint64_t limit, uint32_t *out) {
+    return hunter_survivors(bits, start, limit, out);
+}
