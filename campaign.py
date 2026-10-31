@@ -12,7 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "campaign"
 ISSUE = "repos/beerooyay/hunter/issues/1/comments"
-END = dt.datetime.fromisoformat("2026-11-01T21:19:00+00:00")
+END = dt.datetime.fromisoformat("2026-11-01T21:23:22+00:00")
 TICK = 900
 STOP = threading.Event()
 
