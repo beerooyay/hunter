@@ -1,0 +1,145 @@
+{
+  "notes": [
+    "counted prime starts from 100003 to 30000000 inclusive in disjoint ranges",
+    "motifs overlap across candidate patterns; aggregate counts are not independent Bernoulli samples",
+    "bridge policy chosen without examining occurrence data",
+    "consecutive means exactly the six prescribed prime locations in the interval",
+    "not evidence of advantage for 1700-digit primorial searches"
+  ],
+  "by_range": {
+    "100k_to_4m": {
+      "policies": {
+        "shortest": {
+          "tuples": 7870,
+          "consecutive": 4267
+        },
+        "max_series": {
+          "tuples": 21701,
+          "consecutive": 573
+        },
+        "void_adjusted": {
+          "tuples": 11888,
+          "consecutive": 4971
+        }
+      },
+      "matched_pairs": 289,
+      "per_pair_comparison": {
+        "void_adjusted_vs_shortest": {
+          "better": 106,
+          "equal": 161,
+          "worse": 22
+        },
+        "void_adjusted_vs_max_series": {
+          "better": 276,
+          "equal": 11,
+          "worse": 2
+        }
+      },
+      "consecutive_uplift_vs_shortest": 0.1649871103820013
+    },
+    "4m_to_8m": {
+      "policies": {
+        "shortest": {
+          "tuples": 4499,
+          "consecutive": 2631
+        },
+        "max_series": {
+          "tuples": 11999,
+          "consecutive": 461
+        },
+        "void_adjusted": {
+          "tuples": 6712,
+          "consecutive": 3100
+        }
+      },
+      "matched_pairs": 289,
+      "per_pair_comparison": {
+        "void_adjusted_vs_shortest": {
+          "better": 91,
+          "equal": 168,
+          "worse": 30
+        },
+        "void_adjusted_vs_max_series": {
+          "better": 275,
+          "equal": 12,
+          "worse": 2
+        }
+      },
+      "consecutive_uplift_vs_shortest": 0.17825921702774616
+    },
+    "8m_to_12m": {
+      "policies": {
+        "shortest": {
+          "tuples": 3666,
+          "consecutive": 2202
+        },
+        "max_series": {
+          "tuples": 10055,
+          "consecutive": 385
+        },
+        "void_adjusted": {
+          "tuples": 5393,
+          "consecutive": 2510
+        }
+      },
+      "matched_pairs": 289,
+      "per_pair_comparison": {
+        "void_adjusted_vs_shortest": {
+          "better": 88,
+          "equal": 172,
+          "worse": 29
+        },
+        "void_adjusted_vs_max_series": {
+          "better": 274,
+          "equal": 13,
+          "worse": 2
+        }
+      },
+      "consecutive_uplift_vs_shortest": 0.13987284287011814
+    },
+    "12m_to_30m": {
+      "policies": {
+        "shortest": {
+          "tuples": 12398,
+          "consecutive": 7679
+        },
+        "max_series": {
+          "tuples": 34553,
+          "consecutive": 1563
+        },
+        "void_adjusted": {
+          "tuples": 18709,
+          "consecutive": 9146
+        }
+      },
+      "matched_pairs": 289,
+      "per_pair_comparison": {
+        "void_adjusted_vs_shortest": {
+          "better": 114,
+          "equal": 160,
+          "worse": 15
+        },
+        "void_adjusted_vs_max_series": {
+          "better": 277,
+          "equal": 10,
+          "worse": 2
+        }
+      },
+      "consecutive_uplift_vs_shortest": 0.19104050006511275
+    }
+  },
+  "total": {
+    "shortest": {
+      "tuples": 28433,
+      "consecutive": 16779
+    },
+    "max_series": {
+      "tuples": 78308,
+      "consecutive": 2982
+    },
+    "void_adjusted": {
+      "tuples": 42702,
+      "consecutive": 19727
+    }
+  }
+}
