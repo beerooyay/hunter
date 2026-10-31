@@ -1,0 +1,8 @@
+{
+  "num_patterns": 867,
+  "unique_pairs": 289,
+  "window": 96,
+  "pairs_with_better_candidate": 289,
+  "median_ratio": 2.897473800330943,
+  "largest_ratio": 9.667977970102282
+}
