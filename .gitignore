@@ -25,3 +25,5 @@ python-v3/hunt.log
 python-v3/STOP
 python-v3/records.txt
 .DS_Store
+*.ll
+*.o
