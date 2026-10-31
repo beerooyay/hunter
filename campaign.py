@@ -107,10 +107,9 @@ def checkpoint(label, research, frontier):
         f"- moon independent test: last target merit={recent.get('merit','-')}, "
         f"candidates={recent.get('tested','-')}, local improvements={recent.get('records','-')}, "
         f"best merit={recent.get('best','-')}\n"
-        f"- separate large-prime lane: tested={large.get('tested',0)}, "
-        f"largest probable prime={large.get('best_bits',0)} bits; **not proven / not world record**\n"
+        
         f"- processes: research={research.poll() if research.poll() is not None else 'running'}, "
-        f"frontier={frontier.poll() if frontier.poll() is not None else 'running'}\n"
+        f"frontier={frontier.poll() if frontier is not None and frontier.poll() is not None else ('not launched' if frontier is None else 'running')}\n"
         f"- tests are exploratory. endpoint BPSW + next_prime is not a certificate; "
         f"table improvements are against a local snapshot, not necessarily current global records."
     )
@@ -132,19 +131,17 @@ def main():
                                               github_run=os.getenv("GITHUB_RUN_ID")),indent=2)+"\n")
     research_cmd = [sys.executable,"-u",str(ROOT/"research.py"),"--seconds",str(duration),
                     "--state",str(DATA/"learning"),"--seed","3050"]
-    frontier_cmd = [sys.executable,"-u",str(ROOT/"prime_frontier.py"),"--seconds",str(duration),
-                    "--state",str(DATA/"frontier.json")]
+    frontier_cmd = None
     with (DATA/"research.log").open("a") as log1, (DATA/"frontier.log").open("a") as log2:
         research = subprocess.Popen(["nice","-n","10",*research_cmd],cwd=ROOT,
                        stdout=log1,stderr=subprocess.STDOUT,start_new_session=True)
-        frontier = subprocess.Popen(["nice","-n","15",*frontier_cmd],cwd=ROOT,
-                       stdout=log2,stderr=subprocess.STDOUT,start_new_session=True)
+        frontier = None
         deadline=time.monotonic()+duration
         moon = threading.Thread(target=moon_loop,args=(deadline,),daemon=True)
         moon.start()
         report(f"### campaign compute started\nrun={os.getenv('GITHUB_RUN_ID','local')}, "
                f"planned segment={duration//60} min; stop no later than {END.isoformat()}. "
-               "three independent, bounded experimental lanes on free standard linux cpu.")
+               "two independent prime-gap merit experimental lanes on free standard linux cpu.")
         try:
             i=0
             while time.monotonic()<deadline:
