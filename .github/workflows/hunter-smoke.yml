@@ -1,0 +1,8 @@
+name: Hunter Linux smoke test
+on: workflow_dispatch
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m py_compile campaign.py research.py moon.py
