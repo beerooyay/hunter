@@ -124,7 +124,23 @@ int rt_cpu_fermat_batch(const uint32_t *nums, const uint32_t *rmods, int nl, int
     for (int i = 0; i < count; i++) out[i] = (uint8_t)rt_fermat_one(nums + (size_t)i * nl, rmods + (size_t)i * nl, nl);
     return 0;
 }
+// exact fallback with GMP: same answer as the GPU (2^(n-1) mod n == 1), ~15x faster than the
+// Montgomery reference above. used whenever a GPU batch fails.
+int rt_gmp_fermat_batch(const uint32_t *nums, const uint32_t *rmods, int nl, int count, uint8_t *out) {
+    (void)rmods;
+    mpz_t n, e, r, two;
+    mpz_init(n); mpz_init(e); mpz_init(r); mpz_init_set_ui(two, 2);
+    for (int i = 0; i < count; i++) {
+        mpz_import(n, (size_t)nl, -1, 4, 0, 0, nums + (size_t)i * nl);
+        mpz_sub_ui(e, n, 1);
+        mpz_powm(r, two, e, n);
+        out[i] = mpz_cmp_ui(r, 1) == 0 ? 1 : 0;
+    }
+    mpz_clear(n); mpz_clear(e); mpz_clear(r); mpz_clear(two);
+    return 0;
+}
 #ifndef HUNTER_METAL
+void rt_gpu_set_budget_ms(int ms) { (void)ms; }
 int rt_gpu_available(void) { return 0; }
 const char *rt_gpu_name(void) { return "none (cpu reference stands in)"; }
 const char *rt_gpu_error(void) { return ""; }

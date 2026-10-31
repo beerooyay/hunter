@@ -40,9 +40,9 @@ export PATH="$HOME/.local/bin:$PATH"   # add this line to ~/.zshrc too
 # 3. the hunter
 git clone https://github.com/beerooyay/hunter ~/hunter
 cd ~/hunter
-./build.sh test                 # builds ./hunter, then checks the GPU kernel's math against GMP
+./build.sh test                 # builds ./hunter, then checks the GPU kernel's math against GMP (~1 min)
 ./hunter bench                  # CPU vs GPU speed on this machine, plus a math check on the real GPU
-./hunter                        # the control room opens at http://localhost:8765
+./hunter                        # the control room: run this on its own line, it opens http://localhost:8765
 ```
 
 If `scripts/install.sh` gives you trouble, this works too:
@@ -106,13 +106,16 @@ on your machine and are ignored by git.
 
 ## Status of the GPU path
 
-- The kernel's math is verified on the CPU. `./build.sh test` runs the exact `fermat.metal` source on the
-  CPU and gets 0 mismatches against GMP across 260 answers, including Carmichael numbers and other base-2
-  pseudoprimes.
-- The Praetor wavefront path that feeds the GPU produces the same output as the sequential CPU path in
-  every mathematical column.
-- **It has not run on Apple hardware yet.** `./hunter bench` on an M-series Mac is the first real test.
-  If Metal refuses the kernel, bench prints the compiler's error and the hunter keeps running on the CPU.
-- Expect the GPU to *add* to the CPU cores rather than replace them. GMP on one P-core is very fast at
-  1,700 digits, and the kernel is plain schoolbook Montgomery. A dedicated squaring kernel and sliding
-  windows are the next speedups if the bench shows it's worth it.
+- **Kernel design (v2).** One SIMD group (32 lanes) cooperates on each number, holding it in
+  registers (a 1,706-digit number is 6 limbs per lane). Montgomery multiplication runs with
+  carry-save accumulators, and only 32-bit values move between lanes. The exponent is walked in
+  short dispatches of about 40 ms each, so the GPU never runs one long command.
+- **Verified on the CPU.** `./build.sh test` runs the exact `fermat.metal` source with emulated SIMD
+  groups of width 2, 4 and 32 (real threads, real shuffles) and gets 0 mismatches against GMP. That
+  includes Carmichael numbers and other base-2 pseudoprimes, real primes, and chunked walks of the
+  exponent.
+- **On an M4 Max:** Apple's Metal compiler accepted the first kernel. The first kernel (one thread per
+  number) was far too slow per thread, which is why v2 exists. `./hunter bench` measures v2. It is
+  time-boxed, so it can't hang the machine.
+- The Praetor wavefront path that feeds the GPU produces the same output as the sequential CPU path
+  in every mathematical column. If a GPU batch ever fails, the hunter redoes that batch with GMP.

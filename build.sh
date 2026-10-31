@@ -39,8 +39,11 @@ clang $CFLAGS -c "$PLAT" -o build/mmlrt_plat.o
 clang build/hunter.o build/mmlrt_common.o build/mmlrt_plat.o build/hunter_rt.o $EXTRA $GMP_LIB -lgmp -lm -o hunter
 echo "built ./hunter"
 if [ "${1:-}" = "test" ]; then
+  # run the exact gpu kernel source on the cpu, with emulated simd groups of width 2, 4 and 32
   echo 'namespace metal {}' > build/shim/metal_stdlib
   sed -E 's/\[\[[^]]*\]\]//g' rt/fermat.metal > build/fermat_cpu.h
-  clang++ -std=c++17 -O2 -w $GMP_INC -Ibuild/shim -Ibuild rt/test_msl.cpp $GMP_LIB -lgmp -o build/test_msl
-  ./build/test_msl
+  for W in 2 4 32; do
+    clang++ -std=c++17 -O2 -w -DSIMD_W=$W $GMP_INC -Ibuild/shim -Ibuild rt/test_msl.cpp $GMP_LIB -lgmp -lpthread -o build/test_msl_$W
+    ./build/test_msl_$W
+  done
 fi

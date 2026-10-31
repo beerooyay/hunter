@@ -37,6 +37,8 @@ extern fn rt_cpu_fermat_batch(nums: *u32, rmods: *u32, nl: i32, count: i32, out:
 extern fn rt_gpu_name() -> *const u8;
 extern fn rt_gpu_set_mode(m: i32);
 extern fn rt_gpu_error() -> *const u8;
+extern fn rt_gpu_set_budget_ms(ms: i32);
+extern fn rt_gmp_fermat_batch(nums: *u32, rmods: *u32, nl: i32, count: i32, out: *u8) -> i32;
 extern fn rt_strlen(s: *const u8) -> u64;
 extern fn rt_mpz_bits(z: *void) -> i32;
 extern fn memcpy(dst: *void, src: *const void, n: u64) -> *void;
@@ -818,8 +820,8 @@ fn grp_run(write c: Ctx, write g: Grp, write o: Out) {
             if used < 0 {
                 // never trust a failed dispatch: a prime reported as composite would fake a longer gap.
                 // redo the batch with the exact cpu path and say so on stderr (the server ignores it)
-                io.eprintln("hunter: gpu dispatch failed, redoing this batch on the cpu");
-                rt_cpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(c.nl), i32(cnt), &mut res[0]);
+                io.eprintln("hunter: gpu dispatch failed, redoing this batch on the cpu (gmp)");
+                rt_gmp_fermat_batch(&mut nums[0], &mut rmods[0], i32(c.nl), i32(cnt), &mut res[0]);
             }
         }
         tests_total = tests_total + cnt;
@@ -1295,33 +1297,47 @@ fn cmd_bench() -> i32 {
         let gn = rt_gpu_name();
         ps(o, "  gpu: ");
         let gs = slice(gn, rt_strlen(gn));
-        let q: u64 = 0;
-        while q < gs.len { pb(o, gs[q]); q = q + 1; }
+        pbs(o, gs, 0, gs.len);
         pb(o, 10);
+        // first a small batch (compiles the pipeline, proves the kernel runs), then the real one.
+        // both are time-boxed: the bench can never hang the machine
+        let w = count;
+        if w > 32 { w = 32; }
+        ps(o, "  gpu  warm-up, "); pu(o, w); ps(o, " numbers ... ");
         flush(o);
-        let mode: i32 = 1;
-        while mode <= 2 {
-            rt_gpu_set_mode(mode);
-            let w = count;
-            if w > 64 { w = 64; }
-            rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(w), &mut res[0]);   // warm-up
+        rt_gpu_set_budget_ms(60000);
+        let tw = rt_now_ns();
+        let uw = rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(w), &mut res[0]);
+        let ok = uw >= 0;
+        if ok {
+            psec(o, rt_now_ns() - tw, 2); ps(o, " s\n");
+        } else {
+            ps(o, "failed: "); let ge0 = rt_gpu_error(); pbs(o, slice(ge0, rt_strlen(ge0)), 0, rt_strlen(ge0)); pb(o, 10);
+        }
+        flush(o);
+        if ok {
+            ps(o, "  gpu  full batch, "); pu(o, count); ps(o, " numbers ... ");
+            flush(o);
+            rt_gpu_set_budget_ms(180000);
             let t2 = rt_now_ns();
             let used = rt_gpu_fermat_batch(&mut nums[0], &mut rmods[0], i32(nl), i32(count), &mut res[0]);
             let gpu_ns = (rt_now_ns() - t2) / count;
-            let bad: u64 = 0;
-            i = 0;
-            while i < known { if res[i] != gmpr[i] { bad = bad + 1; } i = i + 1; }
-            if mode == 1 { ps(o, "  gpu  (device scratch)   "); } else { ps(o, "  gpu  (on-chip scratch)  "); }
-            if used < 0 { ps(o, "failed\n"); } else {
-                psec(o, gpu_ns * 1000, 3); ps(o, " ms/test  =  "); pu(o, 1000000000 / (gpu_ns + 1));
-                ps(o, " tests/s   ("); pu(o, bad); ps(o, " mismatches vs gmp of "); pu(o, known); ps(o, ")   = ");
-                pfix(o, muldiv(1000000000 / (gpu_ns + 1), u64(1) << 20, ncpu * 1000000000 / cpu_ns), 20, 2);
-                ps(o, "x all cpu cores\n");
+            if used < 0 {
+                ps(o, "\n       "); let ge = rt_gpu_error(); pbs(o, slice(ge, rt_strlen(ge)), 0, rt_strlen(ge)); pb(o, 10);
+            } else {
+                let bad: u64 = 0;
+                i = 0;
+                while i < known { if res[i] != gmpr[i] { bad = bad + 1; } i = i + 1; }
+                psec(o, gpu_ns * count, 2); ps(o, " s\n");
+                ps(o, "  gpu  (32 lanes per number) "); psec(o, gpu_ns * 1000, 3); ps(o, " ms/test  =  ");
+                pu(o, 1000000000 / (gpu_ns + 1)); ps(o, " tests/s   ("); pu(o, bad); ps(o, " mismatches vs gmp of ");
+                pu(o, known); ps(o, ")\n");
+                ps(o, "       = "); pfix(o, muldiv(1000000000 / (gpu_ns + 1), u64(1) << 20, ncpu * 1000000000 / cpu_ns), 20, 2);
+                ps(o, "x all "); pu(o, ncpu); ps(o, " cpu cores\n");
             }
             flush(o);
-            mode = mode + 1;
         }
-        rt_gpu_set_mode(0);
+        rt_gpu_set_budget_ms(0);
     } else {
         let ge = rt_gpu_error();
         let gl = rt_strlen(ge);
