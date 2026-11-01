@@ -1,0 +1,132 @@
+{
+  "claim_id": "d207b60843f83b9719ee9bbec2afdc8b40922e87fb35d0f7c84380d151b2726d",
+  "certificate_id": "dccac33051f1daa50e85705adf51998d40d8c9a52eba78cc6e0c113d0ba427cb",
+  "payload": {
+    "statement": {
+      "type": "minimum_admissible_bridge",
+      "left": [
+        6,
+        10,
+        8,
+        10,
+        2,
+        4,
+        8
+      ],
+      "right": [
+        8,
+        4,
+        2,
+        10,
+        8,
+        10,
+        6
+      ]
+    },
+    "constraints": [
+      {
+        "prime": 2,
+        "unused_left": [
+          1
+        ],
+        "unused_right": [
+          1
+        ],
+        "valid_bridge_residues": [
+          0
+        ]
+      },
+      {
+        "prime": 3,
+        "unused_left": [
+          2
+        ],
+        "unused_right": [
+          1
+        ],
+        "valid_bridge_residues": [
+          1
+        ]
+      },
+      {
+        "prime": 5,
+        "unused_left": [
+          2
+        ],
+        "unused_right": [
+          1
+        ],
+        "valid_bridge_residues": [
+          3
+        ]
+      },
+      {
+        "prime": 7,
+        "unused_left": [
+          4
+        ],
+        "unused_right": [
+          2
+        ],
+        "valid_bridge_residues": [
+          3
+        ]
+      },
+      {
+        "prime": 11,
+        "unused_left": [
+          8,
+          9,
+          10
+        ],
+        "unused_right": [
+          5,
+          6,
+          7
+        ],
+        "valid_bridge_residues": [
+          0,
+          1,
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "prime": 13,
+        "unused_left": [
+          2,
+          4,
+          5,
+          7,
+          12
+        ],
+        "unused_right": [
+          2,
+          4,
+          5,
+          7,
+          10
+        ],
+        "valid_bridge_residues": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          9,
+          11,
+          12
+        ]
+      }
+    ],
+    "crt_period": 30030,
+    "valid_classes": 50,
+    "minimum_bridge": 1858,
+    "kind": "finite_modular_certificate",
+    "lean_checked": false,
+    "historically_novel": false
+  }
+}
