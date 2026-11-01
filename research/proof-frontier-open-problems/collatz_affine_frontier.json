@@ -1,0 +1,195 @@
+{
+  "scope": "exact finite-time affine cells, NOT eventual convergence",
+  "survey": [
+    {
+      "steps": 3,
+      "residue_classes": 8,
+      "asymptotic_descent_classes": 6,
+      "asymptotic_fraction": 0.75,
+      "descent_from_k0_classes": 2,
+      "no_guaranteed_h_step_descent": 2,
+      "example_unsettled_by_h_step_test": [
+        3,
+        7
+      ],
+      "certificate": "05a2eb53e712785a07a90129592440df2acd77241b9a87c004b596897accdb0b"
+    },
+    {
+      "steps": 4,
+      "residue_classes": 16,
+      "asymptotic_descent_classes": 8,
+      "asymptotic_fraction": 0.5,
+      "descent_from_k0_classes": 7,
+      "no_guaranteed_h_step_descent": 8,
+      "example_unsettled_by_h_step_test": [
+        1,
+        3,
+        6,
+        7,
+        9,
+        11,
+        14,
+        15
+      ],
+      "certificate": "918a4bb550c57bb1bb9fe2554870b7b8fe0ac0095c777846a1242ab2cff7ada1"
+    },
+    {
+      "steps": 5,
+      "residue_classes": 32,
+      "asymptotic_descent_classes": 10,
+      "asymptotic_fraction": 0.3125,
+      "descent_from_k0_classes": 9,
+      "no_guaranteed_h_step_descent": 22,
+      "example_unsettled_by_h_step_test": [
+        1,
+        2,
+        3,
+        6,
+        7,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17
+      ],
+      "certificate": "334ef54f9e041ceb30de2428d09e6558a1c5897763e919e01a07fe6939aeebeb"
+    },
+    {
+      "steps": 6,
+      "residue_classes": 64,
+      "asymptotic_descent_classes": 44,
+      "asymptotic_fraction": 0.6875,
+      "descent_from_k0_classes": 40,
+      "no_guaranteed_h_step_descent": 20,
+      "example_unsettled_by_h_step_test": [
+        7,
+        9,
+        11,
+        14,
+        15,
+        23,
+        25,
+        27,
+        30,
+        31,
+        39,
+        41
+      ],
+      "certificate": "a9c17179d0b15c09c28685c4d58bf10b3665ea60afef4ffc3cfeb1c60d42dee5"
+    },
+    {
+      "steps": 8,
+      "residue_classes": 256,
+      "asymptotic_descent_classes": 208,
+      "asymptotic_fraction": 0.8125,
+      "descent_from_k0_classes": 204,
+      "no_guaranteed_h_step_descent": 48,
+      "example_unsettled_by_h_step_test": [
+        7,
+        9,
+        15,
+        27,
+        30,
+        31,
+        39,
+        41,
+        47,
+        59,
+        62,
+        63
+      ],
+      "certificate": "ab96c5ae305b9763d7d138c2c4ddb42c9fb8578e4d8f4cad3b1595e3a3d3312d"
+    },
+    {
+      "steps": 10,
+      "residue_classes": 1024,
+      "asymptotic_descent_classes": 512,
+      "asymptotic_fraction": 0.5,
+      "descent_from_k0_classes": 511,
+      "no_guaranteed_h_step_descent": 512,
+      "example_unsettled_by_h_step_test": [
+        1,
+        7,
+        9,
+        11,
+        14,
+        15,
+        18,
+        19,
+        25,
+        27,
+        28,
+        29
+      ],
+      "certificate": "76cf7e38d8610cbd75d40f75c899507807670effccb395462cec8546c62e0616"
+    }
+  ],
+  "examples_h3": [
+    {
+      "r": 0,
+      "a": 1,
+      "b": 0,
+      "trace": "EEE",
+      "eventually_descends": true,
+      "min_k_for_descent": 1
+    },
+    {
+      "r": 1,
+      "a": 6,
+      "b": 1,
+      "trace": "OEE",
+      "eventually_descends": true,
+      "min_k_for_descent": 1
+    },
+    {
+      "r": 2,
+      "a": 6,
+      "b": 2,
+      "trace": "EOE",
+      "eventually_descends": true,
+      "min_k_for_descent": 1
+    },
+    {
+      "r": 3,
+      "a": 36,
+      "b": 16,
+      "trace": "OEO",
+      "eventually_descends": false,
+      "min_k_for_descent": null
+    },
+    {
+      "r": 4,
+      "a": 6,
+      "b": 4,
+      "trace": "EEO",
+      "eventually_descends": true,
+      "min_k_for_descent": 1
+    },
+    {
+      "r": 5,
+      "a": 6,
+      "b": 4,
+      "trace": "OEE",
+      "eventually_descends": true,
+      "min_k_for_descent": 0
+    },
+    {
+      "r": 6,
+      "a": 6,
+      "b": 5,
+      "trace": "EOE",
+      "eventually_descends": true,
+      "min_k_for_descent": 0
+    },
+    {
+      "r": 7,
+      "a": 36,
+      "b": 34,
+      "trace": "OEO",
+      "eventually_descends": false,
+      "min_k_for_descent": null
+    }
+  ]
+}
