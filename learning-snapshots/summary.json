@@ -1,17 +1,17 @@
 {
   "version": "target-learner-v1",
-  "updated": 1793510739.558803,
-  "pid": 214,
+  "updated": 1793514770.3978012,
+  "pid": 211,
   "status": "running",
-  "phase": "round 1641: 1439#/2310, merit 50, modeled yield per elapsed hour",
+  "phase": "round 1830: 1439#/2310, merit 50, modeled yield per elapsed hour",
   "lanes": {
     "control": {
-      "tested": 1612,
-      "completed": 1612,
+      "tested": 1798,
+      "completed": 1798,
       "best": 15.561911075196788,
       "observed": {
-        "5": 405,
-        "10": 46,
+        "5": 450,
+        "10": 52,
         "15": 1,
         "20": 0,
         "25": 0,
@@ -20,24 +20,24 @@
         "50": 0
       },
       "predicted": {
-        "5": 410.51242106735606,
-        "10": 55.66063586526456,
-        "15": 4.3487382703681705,
-        "20": 0.217806199171415,
-        "25": 0.007674179586361075,
-        "30": 0.00020533825488591156,
-        "40": 7.826648575501812e-08,
-        "50": 1.534633422791116e-11
+        "5": 457.92223044598927,
+        "10": 62.00232147367867,
+        "15": 4.836908816862805,
+        "20": 0.24173675085982474,
+        "25": 0.008494304043754763,
+        "30": 0.0002265740500090924,
+        "40": 8.587297278900139e-08,
+        "50": 1.678122826673059e-11
       }
     },
     "aimed": {
-      "tested": 4839,
-      "completed": 4839,
+      "tested": 5397,
+      "completed": 5397,
       "best": 18.654614872271075,
       "observed": {
-        "5": 1309,
-        "10": 155,
-        "15": 13,
+        "5": 1472,
+        "10": 186,
+        "15": 15,
         "20": 0,
         "25": 0,
         "30": 0,
@@ -45,94 +45,94 @@
         "50": 0
       },
       "predicted": {
-        "5": 1306.2534021286401,
-        "10": 188.84511267139496,
-        "15": 15.814499180568102,
-        "20": 0.847735907942833,
-        "25": 0.03176865593958001,
-        "30": 0.0008958406165425967,
-        "40": 3.7106827787394837e-07,
-        "50": 7.786024971992081e-11
+        "5": 1457.9455667793525,
+        "10": 210.6900942884654,
+        "15": 17.620654426192498,
+        "20": 0.9427391591534552,
+        "25": 0.03524572364331911,
+        "30": 0.0009914029000772384,
+        "40": 4.087125627415326e-07,
+        "50": 8.537537366030224e-11
       }
     }
   },
   "arms": {
     "337#/210": {
-      "rows": 246,
-      "trials": 5434,
-      "successes": 492,
-      "expected_successes": 468.7960691189816,
-      "observed_over_expected": 1.0494968546230048,
+      "rows": 266,
+      "trials": 5872,
+      "successes": 532,
+      "expected_successes": 506.53486182775697,
+      "observed_over_expected": 1.0502732192614657,
       "fitted_scale": 1.05,
       "research_scale": 1.0,
-      "train_successes": 404,
-      "holdout_successes": 88,
-      "holdout_gain_nats": -0.3969485027667104,
+      "train_successes": 430,
+      "holdout_successes": 102,
+      "holdout_gain_nats": -0.4843785179235495,
       "gate_passed": false
     },
     "337#/2310": {
-      "rows": 208,
-      "trials": 4697,
-      "successes": 416,
-      "expected_successes": 407.8549869554307,
-      "observed_over_expected": 1.0199703652157608,
-      "fitted_scale": 1.0224859391959396,
+      "rows": 224,
+      "trials": 5038,
+      "successes": 448,
+      "expected_successes": 437.5672703338701,
+      "observed_over_expected": 1.0238425731846204,
+      "fitted_scale": 1.0265885836188315,
       "research_scale": 1.0,
-      "train_successes": 344,
-      "holdout_successes": 72,
-      "holdout_gain_nats": -0.01776965607299122,
+      "train_successes": 370,
+      "holdout_successes": 78,
+      "holdout_gain_nats": -0.022268417589434972,
       "gate_passed": false
     },
     "1439#/210": {
-      "rows": 1784,
-      "trials": 170509,
-      "successes": 3568,
-      "expected_successes": 3488.658020028673,
-      "observed_over_expected": 1.0227428367916311,
-      "fitted_scale": 1.023531852002088,
+      "rows": 2008,
+      "trials": 192687,
+      "successes": 4016,
+      "expected_successes": 3942.3651784539506,
+      "observed_over_expected": 1.0186778287177665,
+      "fitted_scale": 1.0188250673922081,
       "research_scale": 1.0,
-      "train_successes": 2844,
-      "holdout_successes": 724,
-      "holdout_gain_nats": 0.1202734092159173,
+      "train_successes": 3194,
+      "holdout_successes": 822,
+      "holdout_gain_nats": 0.1254137827612994,
       "gate_passed": false
     },
     "1439#/2310": {
-      "rows": 3726,
-      "trials": 361059,
-      "successes": 7452,
-      "expected_successes": 7400.0727916886,
-      "observed_over_expected": 1.0070171212869314,
-      "fitted_scale": 1.0054998323697872,
+      "rows": 4170,
+      "trials": 406805,
+      "successes": 8340,
+      "expected_successes": 8337.627009686423,
+      "observed_over_expected": 1.0002846121937117,
+      "fitted_scale": 0.9975840330856953,
       "research_scale": 1.0,
-      "train_successes": 5956,
-      "holdout_successes": 1496,
-      "holdout_gain_nats": 0.08488376593365005,
+      "train_successes": 6684,
+      "holdout_successes": 1656,
+      "holdout_gain_nats": -0.05086616114362046,
       "gate_passed": false
     },
     "4001#/210": {
-      "rows": 208,
-      "trials": 54549,
-      "successes": 416,
-      "expected_successes": 397.39617185408514,
-      "observed_over_expected": 1.0468143114190485,
-      "fitted_scale": 1.0367106807001618,
+      "rows": 235,
+      "trials": 61962,
+      "successes": 470,
+      "expected_successes": 451.39508133337915,
+      "observed_over_expected": 1.0412164851501342,
+      "fitted_scale": 1.0267234932152858,
       "research_scale": 1.0,
-      "train_successes": 338,
-      "holdout_successes": 78,
-      "holdout_gain_nats": 0.16120907812529012,
+      "train_successes": 370,
+      "holdout_successes": 100,
+      "holdout_gain_nats": 0.1888838706222186,
       "gate_passed": false
     },
     "4001#/2310": {
-      "rows": 279,
-      "trials": 72945,
-      "successes": 558,
-      "expected_successes": 531.7317716732131,
-      "observed_over_expected": 1.0494012765950171,
-      "fitted_scale": 1.0270660260694056,
+      "rows": 292,
+      "trials": 76160,
+      "successes": 584,
+      "expected_successes": 555.1664563525993,
+      "observed_over_expected": 1.0519367539545434,
+      "fitted_scale": 1.0294395450689995,
       "research_scale": 1.0,
-      "train_successes": 434,
-      "holdout_successes": 124,
-      "holdout_gain_nats": 0.3416289855170095,
+      "train_successes": 454,
+      "holdout_successes": 130,
+      "holdout_gain_nats": 0.3933894322031867,
       "gate_passed": false
     }
   },
@@ -141,120 +141,120 @@
       "target": 30,
       "P": 337,
       "d": 210,
-      "rounds": 12,
-      "seconds": 9.229622313000007
+      "rounds": 14,
+      "seconds": 11.588491154000003
     },
     {
       "target": 30,
+      "P": 337,
+      "d": 2310,
+      "rounds": 18,
+      "seconds": 15.29209269800008
+    },
+    {
+      "target": 30,
+      "P": 1439,
+      "d": 210,
+      "rounds": 389,
+      "seconds": 989.7008865360001
+    },
+    {
+      "target": 30,
+      "P": 1439,
+      "d": 2310,
+      "rounds": 132,
+      "seconds": 323.3093034970003
+    },
+    {
+      "target": 30,
+      "P": 4001,
+      "d": 210,
+      "rounds": 24,
+      "seconds": 1336.4999987360002
+    },
+    {
+      "target": 30,
+      "P": 4001,
+      "d": 2310,
+      "rounds": 20,
+      "seconds": 1047.3551961340002
+    },
+    {
+      "target": 40,
+      "P": 337,
+      "d": 210,
+      "rounds": 22,
+      "seconds": 20.504364615000032
+    },
+    {
+      "target": 40,
       "P": 337,
       "d": 2310,
       "rounds": 17,
-      "seconds": 14.22585923700008
-    },
-    {
-      "target": 30,
-      "P": 1439,
-      "d": 210,
-      "rounds": 346,
-      "seconds": 868.9349835360001
-    },
-    {
-      "target": 30,
-      "P": 1439,
-      "d": 2310,
-      "rounds": 119,
-      "seconds": 287.10561363100027
-    },
-    {
-      "target": 30,
-      "P": 4001,
-      "d": 210,
-      "rounds": 22,
-      "seconds": 1252.7477457300001
-    },
-    {
-      "target": 30,
-      "P": 4001,
-      "d": 2310,
-      "rounds": 18,
-      "seconds": 948.766187615
+      "seconds": 15.167306393000128
     },
     {
       "target": 40,
-      "P": 337,
+      "P": 1439,
       "d": 210,
-      "rounds": 20,
-      "seconds": 18.063822263000038
+      "rounds": 76,
+      "seconds": 202.78555886700002
     },
     {
       "target": 40,
-      "P": 337,
+      "P": 1439,
       "d": 2310,
+      "rounds": 438,
+      "seconds": 1180.9598438669998
+    },
+    {
+      "target": 40,
+      "P": 4001,
+      "d": 210,
       "rounds": 15,
-      "seconds": 12.805453963000136
-    },
-    {
-      "target": 40,
-      "P": 1439,
-      "d": 210,
-      "rounds": 69,
-      "seconds": 183.15327194299996
-    },
-    {
-      "target": 40,
-      "P": 1439,
-      "d": 2310,
-      "rounds": 391,
-      "seconds": 1042.8038211669998
-    },
-    {
-      "target": 40,
-      "P": 4001,
-      "d": 210,
-      "rounds": 14,
-      "seconds": 765.805915199
+      "seconds": 856.445141778
     },
     {
       "target": 40,
       "P": 4001,
       "d": 2310,
-      "rounds": 24,
-      "seconds": 1277.069210009
+      "rounds": 25,
+      "seconds": 1324.5200044990002
     },
     {
       "target": 50,
       "P": 337,
-      "d": 210,
-      "rounds": 29,
-      "seconds": 28.394388062999862
-    },
-    {
-      "target": 50,
-      "P": 337,
-      "d": 2310,
-      "rounds": 20,
-      "seconds": 18.198581567999945
-    },
-    {
-      "target": 50,
-      "P": 1439,
       "d": 210,
       "rounds": 30,
-      "seconds": 86.73963422599992
+      "seconds": 29.632228720999844
+    },
+    {
+      "target": 50,
+      "P": 337,
+      "d": 2310,
+      "rounds": 21,
+      "seconds": 19.454009097999943
+    },
+    {
+      "target": 50,
+      "P": 1439,
+      "d": 210,
+      "rounds": 36,
+      "seconds": 106.23409434799991
     },
     {
       "target": 50,
       "P": 1439,
       "d": 2310,
-      "rounds": 420,
-      "seconds": 1209.2525460420002
+      "rounds": 471,
+      "seconds": 1373.4686497320004
     },
     {
       "target": 50,
       "P": 4001,
       "d": 210,
-      "rounds": 14,
-      "seconds": 794.328225957
+      "rounds": 17,
+      "seconds": 969.7642295369999
     },
     {
       "target": 50,
@@ -264,7 +264,7 @@
       "seconds": 1391.915328051
     }
   ],
-  "jobs": 1641,
+  "jobs": 1830,
   "records": 0,
   "verified_targets": {
     "30": 0,
