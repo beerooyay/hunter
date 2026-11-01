@@ -1,6 +1,6 @@
 name = "praetorFrontierBridge"
 version = "0.1.0"
-defaultTargets = ["ProofFrontier", "OpenProblems", "Optimality", "GreedyParam", "CRTRealization", "CRTSet", "FullGreedyGoal", "AdmissibleLift"]
+defaultTargets = ["ProofFrontier", "OpenProblems", "Optimality", "GreedyParam", "CRTRealization", "CRTSet", "FullGreedyGoal", "AdmissibleLift", "PrimeParameters"]
 
 [[require]]
 name = "mathlib"
@@ -29,3 +29,6 @@ name = "FullGreedyGoal"
 
 [[lean_lib]]
 name = "AdmissibleLift"
+
+[[lean_lib]]
+name = "PrimeParameters"
