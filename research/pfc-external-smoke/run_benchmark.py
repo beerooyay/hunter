@@ -17,6 +17,7 @@ from collections import Counter
 
 HERE=Path(__file__).resolve().parent
 LAKE=HERE.parent / "proof-frontier-calculus-v02" / "lean"
+LAKE_EXE = str(Path.home()/".elan"/"bin"/"lake") if (Path.home()/".elan"/"bin"/"lake").exists() else "lake"
 BASELINES=["omega","norm_num","ring","simp"]
 PLANS={
     "omega": "  omega",
@@ -32,7 +33,7 @@ def lean_check(statement, body):
         f.write("import Mathlib\n\n"+statement+" := by\n"+body+"\n")
         name=f.name
     try:
-        r=subprocess.run(["lake","env","lean",name],cwd=LAKE,text=True,
+        r=subprocess.run([LAKE_EXE,"env","lean",name],cwd=LAKE,text=True,
                          capture_output=True,timeout=60)
         return r.returncode==0,(r.stderr+"\n"+r.stdout)[-1200:]
     finally: os.unlink(name)
