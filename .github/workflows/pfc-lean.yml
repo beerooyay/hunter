@@ -1,10 +1,8 @@
+# Intentionally manual-only. Lean proof development runs locally.
+# No pull_request or push triggers: avoid notification spam.
 name: proof-frontier-lean
 
 on:
-  pull_request:
-    paths:
-      - 'research/proof-frontier-calculus-v02/lean/**'
-      - '.github/workflows/pfc-lean.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,5 +24,5 @@ jobs:
         run: "$HOME/.elan/bin/lake update"
       - name: Download Mathlib compiled cache
         run: "$HOME/.elan/bin/lake exe cache get"
-      - name: Kernel-check proof bridge
+      - name: Kernel-check compiled proofs
         run: "$HOME/.elan/bin/lake build"

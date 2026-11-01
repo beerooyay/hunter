@@ -1,0 +1,49 @@
+{
+  "source": "Karifannaa/BlueprintRepair data/hf/states_v0.jsonl",
+  "source_license": "CC BY 4.0 (original benchmark annotations); embedded miniF2F statements under MIT",
+  "method": "frozen external smoke test, not an unbiased model benchmark; cases selected and inspected manually",
+  "cases": [
+    {
+      "id": "p68_bad",
+      "family": "redundant_dependency",
+      "statement": "theorem p68_target (n : ℕ) (h₀ : n % 7 = 3) : (2 * n + 1) % 7 = 0",
+      "strategy": "omega"
+    },
+    {
+      "id": "p60_bad",
+      "family": "missing_dependency",
+      "statement": "theorem p60_target : 2003 % 11 = 1",
+      "strategy": "norm_num"
+    },
+    {
+      "id": "p74_bad",
+      "family": "redundant_dependency",
+      "statement": "theorem p74_target (x y : ℕ) (h₀ : x % 3 = 2) (h₁ : y % 5 = 4) (h₂ : x % 10 = y % 10) : 14 ≤ x",
+      "strategy": "omega"
+    },
+    {
+      "id": "p103_bad",
+      "family": "monolithic_needs_split",
+      "statement": "theorem p103_target (n : ℕ) : (∑ k ∈ Finset.range n, (2 * k + 1)) = n ^ 2",
+      "strategy": "induction_sum"
+    },
+    {
+      "id": "p88_bad",
+      "family": "missing_hypothesis",
+      "statement": "theorem p88_target (a b : ℕ) (h₀ : 0 < a ∧ 0 < b ∧ b ≤ a) (h₁ : (a + b) % 10 = 2) (h₂ : (2 * a + b) % 10 = 1) : (a - b) % 10 = 6",
+      "strategy": "omega"
+    },
+    {
+      "id": "p27_bad",
+      "family": "missing_hypothesis",
+      "statement": "theorem p27_target (n : ℕ) (h₀ : (3 * n) % 11 = 2) : n % 11 = 8",
+      "strategy": "omega"
+    },
+    {
+      "id": "p117_bad",
+      "family": "monolithic_needs_split",
+      "statement": "theorem p117_target (m n : ℕ) (h₀ : 1 < m) (h₁ : 1 < n) (h₂ : m * n = 2005) : m + n = 406",
+      "strategy": "unimplemented"
+    }
+  ]
+}
