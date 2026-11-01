@@ -29,3 +29,14 @@ Lean 4 and Mathlib v4.35.0 are pinned. Do not claim a Lean result until CI passe
 - **Goedel-Prover-V2** is an advanced theorem prover with published benchmark success rates; our deterministic Python audit is not a comparable ML prover.
 
 Our research question: can explicit *scope preservation*, *human-reviewable failure obligations*, and *globally optimized repair paths* reduce the work needed to convert future candidate conjectures into trustworthy, useful statements? This experiment establishes infrastructure, not an advantage.
+
+## Exact finite-time Collatz residue frontier
+
+`collatz_residue_frontier.py` symbolically propagates all 2^h residue classes through the first h Collatz steps. For n=2^h k+r, each step is affine in k because the coefficient stays even before the final step. Its output provides exact coefficients T^h(n)=A_r k+B_r, a symbolic residue-branch trace, and the smallest nonnegative k (if any) beyond which the h-th iterate is less than n. These are **finite-horizon** facts, not universal convergence.
+
+At h=8, 208/256 residue classes satisfy the eventual h-step descent inequality; 48 do not. At h=10, 512/1024 satisfy it. These ratios need not be monotonic in h. Failure of the h-step test does not imply failure to descend at some earlier or later time. Each class was independently checked numerically for k=0,1,2,3. This calculation is exact Python arithmetic with elementary derivation; **the full residue table is not Lean-certified**.
+
+```
+python3 collatz_residue_frontier.py
+python3 -m unittest -q test_frontier_open.py
+```
