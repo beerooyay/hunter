@@ -5,6 +5,7 @@ from pathlib import Path
 import planner
 import checker
 import slack_repair
+import compress
 
 class TestPlanning(unittest.TestCase):
     @classmethod
@@ -47,6 +48,19 @@ class TestPlanning(unittest.TestCase):
             with self.assertRaises(AssertionError):slack_repair.verify(m)
         m=copy.deepcopy(receipts[0]);m['scope']='global n >= 0'
         with self.assertRaises(AssertionError):slack_repair.verify(m)
+
+    def test_compressed_lower_bound(self):
+        receipts=json.loads((Path(__file__).parent/'compressed_certificates.json').read_text())
+        for r in receipts:self.assertTrue(compress.verify(r))
+        self.assertEqual(receipts[6]['lower_count'],66)
+        self.assertEqual(len(receipts[6]['nogoods']),14)
+        for variant in ['modulus','deleted','cost','scope']:
+            m=copy.deepcopy(receipts[6])
+            if variant=='modulus':m['nogoods'][0]['prime']=997
+            if variant=='deleted':m['nogoods']=[]
+            if variant=='cost':m['optimal']['cost']+=2
+            if variant=='scope':m['scope']='a prime gap record'
+            with self.assertRaises(AssertionError):compress.verify(m)
 
     def test_tampering(self):
         r=self.receipts[6]
