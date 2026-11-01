@@ -8,7 +8,7 @@
     {
       "from": "b65ada8312f1c06ce8d93e7c489e6c430feb15b131634fd7ec6f7abebcbc0399",
       "relation": "unresolved_obligation",
-      "to": "82e9d3f9299bbc6783b5b57935dea0e324b54d70d579b0566331d2d323a8065d"
+      "to": "f384155693c7ff2651889d362b2f8c69c94b4ebd7102cc32eb8e1084b84a1573"
     },
     {
       "from": "eec8108f0cab65f854ee911f1686ffcb4020a0d29121ba9c7d2020c1654870fe",
@@ -130,14 +130,14 @@
       "status": "lean_pending"
     },
     {
-      "id": "82e9d3f9299bbc6783b5b57935dea0e324b54d70d579b0566331d2d323a8065d",
+      "id": "f384155693c7ff2651889d362b2f8c69c94b4ebd7102cc32eb8e1084b84a1573",
       "key": "collatz_four_k_three",
-      "kind": "open_branch",
-      "lean_name": null,
-      "proof_file": null,
+      "kind": "obstruction_lemma",
+      "lean_name": "collatz_four_k_three_ascends",
+      "proof_file": "lean/OpenProblems.lean",
       "scope": "k>=0",
-      "statement": "no uniform three-step descent from 4k+3",
-      "status": "example_refuted"
+      "statement": "T^3(4k+3)=18k+16>4k+3 for all k>=0",
+      "status": "lean_pending"
     },
     {
       "id": "eec8108f0cab65f854ee911f1686ffcb4020a0d29121ba9c7d2020c1654870fe",
@@ -200,7 +200,7 @@
       "status": "experiment_only"
     }
   ],
-  "root": "36e9b172d2834618b4e613f1a6fb76a89767d28e070fe5d5c51b23a5b442bc75",
+  "root": "06b0a88dfcc1dd020f28c340b6a136615512e4e31a84021349fc7c46e7d67351",
   "schema": "praetor.scope-frontier.v1",
   "trust_model": {
     "cryptographic_hash": "integrity only",
