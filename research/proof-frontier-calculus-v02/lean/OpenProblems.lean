@@ -69,22 +69,34 @@ theorem goldbach_up_to_30 : GoldbachUpTo 30 := by
   intro n hlo hhi heven
   have hcases : n = 4 ∨ n = 6 ∨ n = 8 ∨ n = 10 ∨ n = 12 ∨ n = 14 ∨ n = 16 ∨ n = 18 ∨ n = 20 ∨ n = 22 ∨ n = 24 ∨ n = 26 ∨ n = 28 ∨ n = 30 := by omega
   rcases hcases with h | h | h | h | h | h | h | h | h | h | h | h | h | h
-  all_goals subst n
-  all_goals first
-    | exact ⟨2, 2, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 3, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 5, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 7, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨5, 7, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 11, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 13, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨5, 13, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 17, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 19, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨5, 19, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨3, 23, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨5, 23, by norm_num, by norm_num, by norm_num⟩
-    | exact ⟨7, 23, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨2, 2, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 3, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 5, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 7, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨5, 7, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 11, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 13, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨5, 13, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 17, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 19, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨5, 19, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨3, 23, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨5, 23, by norm_num, by norm_num, by norm_num⟩
+  · subst n
+    exact ⟨7, 23, by norm_num, by norm_num, by norm_num⟩
 
 theorem goldbach_at_100 :
     ∃ p q : Nat, Nat.Prime p ∧ Nat.Prime q ∧ p + q = 100 := by
