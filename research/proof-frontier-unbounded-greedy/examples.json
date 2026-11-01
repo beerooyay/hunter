@@ -1,0 +1,392 @@
+[
+  {
+    "p": 13,
+    "pattern_sizes": [
+      12,
+      12,
+      13
+    ],
+    "N": 37,
+    "Q_digits": 12,
+    "greedy": [
+      2,
+      24
+    ],
+    "greedy_cost": 26,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "13/3",
+    "obstruction_2_2": [
+      3,
+      13
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        12
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 19,
+    "pattern_sizes": [
+      18,
+      18,
+      19
+    ],
+    "N": 55,
+    "Q_digits": 19,
+    "greedy": [
+      2,
+      36
+    ],
+    "greedy_cost": 38,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "19/3",
+    "obstruction_2_2": [
+      3,
+      19
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        18
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 31,
+    "pattern_sizes": [
+      30,
+      30,
+      31
+    ],
+    "N": 91,
+    "Q_digits": 33,
+    "greedy": [
+      2,
+      60
+    ],
+    "greedy_cost": 62,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "31/3",
+    "obstruction_2_2": [
+      3,
+      31
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        30
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 37,
+    "pattern_sizes": [
+      36,
+      36,
+      37
+    ],
+    "N": 109,
+    "Q_digits": 43,
+    "greedy": [
+      2,
+      72
+    ],
+    "greedy_cost": 74,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "37/3",
+    "obstruction_2_2": [
+      3,
+      37
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        36
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 43,
+    "pattern_sizes": [
+      42,
+      42,
+      43
+    ],
+    "N": 127,
+    "Q_digits": 47,
+    "greedy": [
+      2,
+      84
+    ],
+    "greedy_cost": 86,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "43/3",
+    "obstruction_2_2": [
+      3,
+      43
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        42
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 61,
+    "pattern_sizes": [
+      60,
+      60,
+      61
+    ],
+    "N": 181,
+    "Q_digits": 71,
+    "greedy": [
+      2,
+      120
+    ],
+    "greedy_cost": 122,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "61/3",
+    "obstruction_2_2": [
+      3,
+      61
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        60
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 67,
+    "pattern_sizes": [
+      66,
+      66,
+      67
+    ],
+    "N": 199,
+    "Q_digits": 81,
+    "greedy": [
+      2,
+      132
+    ],
+    "greedy_cost": 134,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "67/3",
+    "obstruction_2_2": [
+      3,
+      67
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        66
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 73,
+    "pattern_sizes": [
+      72,
+      72,
+      73
+    ],
+    "N": 217,
+    "Q_digits": 83,
+    "greedy": [
+      2,
+      144
+    ],
+    "greedy_cost": 146,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "73/3",
+    "obstruction_2_2": [
+      3,
+      73
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        72
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 97,
+    "pattern_sizes": [
+      96,
+      96,
+      97
+    ],
+    "N": 289,
+    "Q_digits": 116,
+    "greedy": [
+      2,
+      192
+    ],
+    "greedy_cost": 194,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "97/3",
+    "obstruction_2_2": [
+      3,
+      97
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        96
+      ],
+      [
+        1
+      ]
+    ]
+  },
+  {
+    "p": 103,
+    "pattern_sizes": [
+      102,
+      102,
+      103
+    ],
+    "N": 307,
+    "Q_digits": 121,
+    "greedy": [
+      2,
+      204
+    ],
+    "greedy_cost": 206,
+    "optimal": [
+      4,
+      2
+    ],
+    "optimal_cost": 6,
+    "approximation_ratio": "103/3",
+    "obstruction_2_2": [
+      3,
+      103
+    ],
+    "all_offsets_even": true,
+    "p_residue_missing": [
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        102
+      ],
+      [
+        1
+      ]
+    ]
+  }
+]
