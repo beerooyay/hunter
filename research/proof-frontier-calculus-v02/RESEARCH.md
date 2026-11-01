@@ -1,6 +1,6 @@
 # proof-frontier calculus v0.2: compositional bridge constraints and global repair planning
 
-**2026-10-31 research run.** This is a finite combinatorial research experiment. No assertion of historical theorem novelty, primality occurrence, production Hunter speedup, or blockchain consensus is made. The Lean core lemma is **not yet compiler/kernel checked** in the local offline environment.
+**2026-10-31 research run.** This is a finite combinatorial research experiment. No assertion of historical theorem novelty, primality occurrence, production Hunter speedup, or blockchain consensus is made. The Lean core difference-set lemma **passed GitHub Actions Lean/Mathlib v4.35.0 kernel compilation**. The larger CRT and finite sharp-bound theorems remain outside that formalized lemma.
 
 ## theorem 1: exact two-pattern bridge phase criterion
 
@@ -51,7 +51,7 @@ For three admissible source motifs A,B,C, a greedy method first minimizes bridge
 - greedy bridges `(18,26)`: total cost **44**
 - jointly optimal bridges `(24,2)`: total cost **26**.
 
-The full 9-position patterns are checked against every obstructing prime p≤9. Every positive even candidate with smaller total gap length is exhausted by `path_receipt`, so the counterexample and repaired minimum are finite exact mathematical claims.
+The full 9-position patterns are checked against every obstructing prime p≤9. Every positive even candidate with smaller total gap length is exhausted by `path_receipt`. A separate `three_way_obstruction_certificate.json` lists **all 66 shorter positive even bridge pairs**, with an explicit first prime modulus that rules out each one (60 by 3, five by 5, one by 7). So the repaired minimum is a fully inspectable finite exact mathematical claim.
 
 The independent exhaustive C study reports:
 
@@ -72,7 +72,7 @@ The second result demonstrates a measurable failure mode for **local mathematica
 - These results are **new to our project registry** and exhaustively established for their stated finite families. A limited prior-art check did not locate the exact maximum values, but historical novelty is **unverified**.
 - Published prime-tuple check/extend tools already perform admissibility repair, so “repairing prime tuples” is NOT itself a new invention. The structural CRT formulation belongs to classical additive combinatorics.
 - No actual prime discovery or performance comparison with Praetor's production hunter is claimed.
-- The Lean source covers only the algebraic missing-residue identity and is currently uncompiled. It does not check the exhaustive maximum bridge results.
+- The Lean source covers only the algebraic missing-residue identity and **was compiled successfully on GitHub-hosted Lean/Mathlib CI**. It does not check the exhaustive maximum bridge results.
 
 ## reproduce
 
