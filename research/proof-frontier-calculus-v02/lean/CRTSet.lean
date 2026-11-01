@@ -20,11 +20,11 @@ theorem lift_exact_residue_set
   refine ⟨R.image f, ?_, ?_⟩
   · calc
       (R.image f).image (fun x => x % p)
-          = R.image (fun r => f r % p) := by rw [Finset.image_image]
+          = R.image (fun r => f r % p) := by simp only [Finset.image_image, Function.comp_apply]
       _ = R.image (fun r => r) := by
           apply Finset.image_congr
           intro r hr
-          rw [(hf r hr).1, Nat.mod_eq_of_lt (hbounded r hr)]
+          exact ((hf r hr).1).trans (Nat.mod_eq_of_lt (hbounded r hr))
       _ = R := by simp
   · intro x hx
     obtain ⟨r, hr, rfl⟩ := Finset.mem_image.mp hx
