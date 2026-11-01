@@ -1,0 +1,95 @@
+{
+  "by_range": {
+    "100k_4m": {
+      "shortest": {
+        "tuples": 7870,
+        "consecutive": 4267
+      },
+      "max_series": {
+        "tuples": 21701,
+        "consecutive": 573
+      },
+      "void_adjusted": {
+        "tuples": 11888,
+        "consecutive": 4971
+      },
+      "conditional": {
+        "tuples": 12439,
+        "consecutive": 4940
+      }
+    },
+    "4m_8m": {
+      "shortest": {
+        "tuples": 4499,
+        "consecutive": 2631
+      },
+      "max_series": {
+        "tuples": 11999,
+        "consecutive": 461
+      },
+      "void_adjusted": {
+        "tuples": 6712,
+        "consecutive": 3100
+      },
+      "conditional": {
+        "tuples": 7014,
+        "consecutive": 3128
+      }
+    },
+    "8m_12m": {
+      "shortest": {
+        "tuples": 3666,
+        "consecutive": 2202
+      },
+      "max_series": {
+        "tuples": 10055,
+        "consecutive": 385
+      },
+      "void_adjusted": {
+        "tuples": 5393,
+        "consecutive": 2510
+      },
+      "conditional": {
+        "tuples": 5626,
+        "consecutive": 2486
+      }
+    },
+    "12m_30m": {
+      "shortest": {
+        "tuples": 12398,
+        "consecutive": 7679
+      },
+      "max_series": {
+        "tuples": 34553,
+        "consecutive": 1563
+      },
+      "void_adjusted": {
+        "tuples": 18709,
+        "consecutive": 9146
+      },
+      "conditional": {
+        "tuples": 19573,
+        "consecutive": 9205
+      }
+    }
+  },
+  "total": {
+    "shortest": {
+      "tuples": 28433,
+      "consecutive": 16779
+    },
+    "max_series": {
+      "tuples": 78308,
+      "consecutive": 2982
+    },
+    "void_adjusted": {
+      "tuples": 42702,
+      "consecutive": 19727
+    },
+    "conditional": {
+      "tuples": 44652,
+      "consecutive": 19759
+    }
+  },
+  "note": "conditional scoring was not fitted on observed counts; not an independent primorial gap test. case overlaps preclude iid inference."
+}
