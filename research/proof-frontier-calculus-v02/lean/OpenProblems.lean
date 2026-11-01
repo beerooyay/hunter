@@ -34,6 +34,26 @@ theorem collatz_four_k_one_descends (k : Nat) (hk : 0 < k) :
     omega
   · omega
 
+/-- The complementary odd residue class *ascends* after three steps.
+    This is an obstruction to a naive universal three-step descent proof. -/
+theorem collatz_four_k_three_ascends (k : Nat) :
+    collatzStep (collatzStep (collatzStep (4 * k + 3))) = 18 * k + 16 ∧
+      4 * k + 3 < 18 * k + 16 := by
+  have hodd : (4 * k + 3) % 2 ≠ 0 := by omega
+  have heven1 : (3 * (4 * k + 3) + 1) % 2 = 0 := by omega
+  have hodd2 : ((3 * (4 * k + 3) + 1) / 2) % 2 ≠ 0 := by omega
+  have e1 : collatzStep (4 * k + 3) = 3 * (4 * k + 3) + 1 := by
+    simp [collatzStep, hodd]
+  have e2 : collatzStep (3 * (4 * k + 3) + 1) = (3 * (4 * k + 3) + 1) / 2 := by
+    simp [collatzStep, heven1]
+  have e3 : collatzStep ((3 * (4 * k + 3) + 1) / 2) =
+      3 * ((3 * (4 * k + 3) + 1) / 2) + 1 := by
+    simp [collatzStep, hodd2]
+  constructor
+  · rw [e1, e2, e3]
+    omega
+  · omega
+
 /-- Global strong Goldbach conjecture: intentionally left open. -/
 def GoldbachConjecture : Prop :=
   ∀ n : Nat, 4 ≤ n → n % 2 = 0 →
