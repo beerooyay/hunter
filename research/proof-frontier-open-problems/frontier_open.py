@@ -19,6 +19,7 @@ def collatz(n): return n//2 if n%2 == 0 else 3*n+1
 
 def verify_collatz_family(limit=250):
     assert all(collatz(collatz(collatz(4*k+1))) == 3*k+1 and 3*k+1<4*k+1 for k in range(1,limit+1))
+    assert all(collatz(collatz(collatz(4*k+3))) == 18*k+16 and 4*k+3 < 18*k+16 for k in range(limit+1))
     # A nearby tempting stronger statement is false: odd 4k+3 does not generally descend in three steps.
     witness=3
     assert collatz(collatz(collatz(witness))) >= witness
@@ -49,7 +50,7 @@ def make_graph():
     nodes=[
       make_node('collatz_all','open_conjecture','forall n>0, some iterate of T reaches 1','all positive integers','open'),
       make_node('collatz_four_k_one','restricted_lemma','T^3(4k+1)=3k+1<4k+1 for all k>0','k>0','lean_pending','lean/OpenProblems.lean','collatz_four_k_one_descends'),
-      make_node('collatz_four_k_three','open_branch','no uniform three-step descent from 4k+3','k>=0','example_refuted'),
+      make_node('collatz_four_k_three','obstruction_lemma','T^3(4k+3)=18k+16>4k+3 for all k>=0','k>=0','lean_pending','lean/OpenProblems.lean','collatz_four_k_three_ascends'),
       make_node('goldbach_all','open_conjecture','all even n>=4 are sums of two primes','all even n>=4','open'),
       make_node('goldbach_30','finite_lemma','all even 4<=n<=30 have two prime summands','4<=n<=30 even','lean_pending','lean/OpenProblems.lean','goldbach_up_to_30'),
       make_node('goldbach_100','instance_lemma','100=3+97, both prime','n=100','lean_pending','lean/OpenProblems.lean','goldbach_at_100'),
