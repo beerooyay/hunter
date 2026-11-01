@@ -14,10 +14,10 @@ theorem lift_exact_residue_set
     (R : Finset Nat) (hbounded : ∀ r ∈ R, r < p) :
     ∃ S : Finset Nat,
       S.image (fun x => x % p) = R ∧
-      (∀ x ∈ S, x % Q = 0) := by
+      (∀ x ∈ S, x % Q = 0) ∧ S.card ≤ R.card := by
   classical
   obtain ⟨f, hf⟩ := lift_finite_residues p Q hcop R
-  refine ⟨R.image f, ?_, ?_⟩
+  refine ⟨R.image f, ?_, ?_, ?_⟩
   · calc
       (R.image f).image (fun x => x % p)
           = R.image (fun r => f r % p) := by simp only [Finset.image_image, Function.comp_apply]
@@ -29,6 +29,7 @@ theorem lift_exact_residue_set
   · intro x hx
     obtain ⟨r, hr, rfl⟩ := Finset.mem_image.mp hx
     exact (hf r hr).2
+  · exact Finset.card_image_le
 
 /-- Divisibility by the common modulus Q forces all residues modulo q|Q
     to be zero. -/
