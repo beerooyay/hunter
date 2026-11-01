@@ -7,6 +7,7 @@
 ```bash
 python3 planner.py
 python3 checker.py certificates.json
+python3 slack_repair.py
 python3 test_planner.py
 ```
 
@@ -27,3 +28,7 @@ The generic certificate/optimality implication is elementary and **not new**. Co
 ## Trust model
 
 Certificate integrity hashes and independent recomputation do not make arbitrary textual statements true. The verifier accepts only two enumerated input encodings, `crt-adversary` and `gap-words`, and a fixed scope string. Certificate JSON has explicit cheaper-pair obstruction witnesses; it contains no ML and makes no permissionless blockchain/security claims.
+
+## Second domain: mathematically exact fudge-factor repair
+
+The same principle applies to a completely different claim form: a finite-range polynomial inequality with an unknown nonnegative additive slack. `slack_repair.py` finds the least slack, supplies an upper-bound check over the finite domain and a tight witness showing every smaller slack fails. Example: the false claim `n² ≤ 7n` for `0≤n≤20` is repaired to `n² ≤ 7n + 260`; its tight witness is `n=20`. Another example gives `n³ ≤ 4n² + 2475` on `0≤n≤15`. Independent verification accepts all three and rejects corrupted optimum, witness, or scope. This is an **elementary, bounded, explicitly represented claim domain**. It does not parse unrestricted English, prove unbounded inequalities, or advance an open mathematical conjecture.
