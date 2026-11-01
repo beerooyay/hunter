@@ -1,0 +1,46 @@
+name: Hunter record-first campaign
+on:
+  workflow_dispatch:
+jobs:
+  hunt-records:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo
+      - name: Build Praetor
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          cd /tmp/Praetor
+          cargo build --release -p ourc
+      - name: Build Hunter
+        env:
+          OURC: /tmp/Praetor/target/release/ourc
+          OUR_RUNTIME: /tmp/Praetor/compiler/runtime
+        run: ./build.sh
+      - name: Run record-first search
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -u native_campaign.py
+      - name: Preserve candidate and learner files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-native-records
+          path: |
+            FOUND.tsv
+            VERIFIED.tsv
+            gaps.tsv
+            jobs.tsv
+            state.tsv
+            hunt.log
+            native-status.json
+            native-server.log
+          retention-days: 7
+          if-no-files-found: warn
