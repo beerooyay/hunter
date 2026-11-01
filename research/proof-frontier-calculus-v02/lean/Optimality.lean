@@ -36,14 +36,20 @@ def missing3 (g h : Nat) : Prop :=
 
 def feasible13 (g h : Nat) : Prop := missing13 g h ∧ missing3 g h
 
-theorem candidate_4_2 : feasible13 4 2 := by decide
+theorem candidate_4_2 : feasible13 4 2 := by
+  constructor
+  · refine ⟨⟨7, by omega⟩, ?_, ?_, ?_⟩ <;> norm_num
+  · refine ⟨⟨2, by omega⟩, ?_, ?_, ?_⟩ <;> norm_num
 
 theorem cheaper_is_impossible (x y : Nat)
     (hx : 0 < x) (hy : 0 < y) (hxe : x % 2 = 0) (hye : y % 2 = 0)
     (hsmall : x + y < 6) : ¬ feasible13 x y := by
   have hs : x = 2 ∧ y = 2 := by omega
   rcases hs with ⟨rfl, rfl⟩
-  decide
+  intro h
+  rcases h.2 with ⟨r, hr0, hr2, hr4⟩
+  have rbound : r.val < 3 := r.isLt
+  omega
 
 theorem global_optimum_is_6 (x y : Nat)
     (hx : 0 < x) (hy : 0 < y) (hxe : x % 2 = 0) (hye : y % 2 = 0)
