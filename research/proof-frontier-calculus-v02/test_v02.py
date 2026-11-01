@@ -25,6 +25,17 @@ class ExactBridgeTests(unittest.TestCase):
         self.assertTrue(verify_path_receipt(r))
         self.assertEqual(r['payload']['greedy_bridges'],[18,26])
         self.assertEqual(r['payload']['optimal_bridges'],[24,2])
+    def test_all_smaller_global_paths_have_explicit_obstructions(self):
+        data=json.loads((P/'three_way_obstruction_certificate.json').read_text())
+        self.assertEqual(len(data['smaller_cost_obstructions']),66)
+        A,B,C=offsets((2,4)),offsets((2,4)),offsets((4,6))
+        self.assertEqual(tuple(data['optimal']['offsets']),join3(A,B,C,24,2))
+        self.assertTrue(admissible(join3(A,B,C,24,2)))
+        for e in data['smaller_cost_obstructions']:
+            g,h,p=e['g'],e['h'],e['obstructing_prime']
+            self.assertLess(g+h,26)
+            H=join3(A,B,C,g,h)
+            self.assertEqual(len({x%p for x in H}),p)
     def test_invalid_mutation_rejected(self):
         rng=random.Random(1007);A=bridge_receipt((6,10,8,10,2,4,8),(8,4,2,10,8,10,6))
         B=path_receipt((2,4),(2,4),(4,6))
