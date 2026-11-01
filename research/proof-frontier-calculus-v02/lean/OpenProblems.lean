@@ -61,10 +61,9 @@ def GoldbachConjecture : Prop :=
 
 /-- Exact finite problem, with bounded finite witness search. -/
 def GoldbachUpTo (bound : Nat) : Prop :=
-  ∀ n ∈ Finset.Icc 4 bound, n % 2 = 0 →
-    ∃ p ∈ Finset.range (bound + 1),
-      ∃ q ∈ Finset.range (bound + 1),
-        Nat.Prime p ∧ Nat.Prime q ∧ p + q = n
+  ∀ n : Fin (bound + 1), 4 ≤ n.val → n.val % 2 = 0 →
+    ∃ p : Fin (bound + 1), ∃ q : Fin (bound + 1),
+      Nat.Prime p.val ∧ Nat.Prime q.val ∧ p.val + q.val = n.val
 
 theorem goldbach_up_to_30 : GoldbachUpTo 30 := by
   decide
