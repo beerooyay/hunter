@@ -1,11 +1,8 @@
+# Intentionally manual-only. Lean proof development runs locally.
+# No pull_request or push triggers: avoid notification spam.
 name: proof-frontier-lean
 
 on:
-  pull_request:
-    paths:
-      - 'research/proof-frontier-calculus-v02/lean/**'
-      - '.github/workflows/pfc-lean.yml'
-      - 'research/pfc-external-smoke/**'
   workflow_dispatch:
 
 permissions:
@@ -27,14 +24,5 @@ jobs:
         run: "$HOME/.elan/bin/lake update"
       - name: Download Mathlib compiled cache
         run: "$HOME/.elan/bin/lake exe cache get"
-      - name: Kernel-check proof bridge
+      - name: Kernel-check compiled proofs
         run: "$HOME/.elan/bin/lake build"
-      - name: External fixed-template Lean smoke test
-        run: python3 ../../pfc-external-smoke/run_benchmark.py
-      - name: Upload reproducible smoke-test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pfc-external-smoke
-          path: research/pfc-external-smoke/results.json
-          if-no-files-found: warn
