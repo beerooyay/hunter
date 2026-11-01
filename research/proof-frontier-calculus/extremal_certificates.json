@@ -1,0 +1,1668 @@
+[
+  {
+    "left": [
+      2,
+      4,
+      6,
+      6
+    ],
+    "right": [
+      2,
+      10,
+      6,
+      6
+    ],
+    "results": [
+      {
+        "bridge": 2,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 4,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 6,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 8,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 10,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 12,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 14,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 16,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 18,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 20,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 22,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 24,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 26,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 28,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 30,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 32,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 34,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 36,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 38,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 40,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 42,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 44,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 46,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 48,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 50,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 52,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 54,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 56,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 58,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 60,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 62,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 64,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 66,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 68,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 70,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 72,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 74,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 76,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 78,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 80,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 82,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 84,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 86,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 88,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 90,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 92,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 94,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 96,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 98,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 100,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,          2
+        ]
+      },
+      {
+        "bridge": 102,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 104,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 106,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 108,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 110,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 112,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 114,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 116,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 118,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 120,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 122,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 124,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 126,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 128,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 130,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 132,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 134,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 136,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 138,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 140,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 142,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 144,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 146,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 148,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 150,
+        "outcome": "admissible",
+        "offsets": [
+          0,
+          2,
+          6,
+          12,
+          18,
+          168,
+          170,
+          180,
+          186,
+          192
+        ],
+        "local_residue_sizes": {
+          "2": 1,
+          "3": 2,
+          "5": 4,
+          "7": 6
+        }
+      }
+    ]
+  },
+  {
+    "left": [
+      6,
+      6,
+      10,
+      2
+    ],
+    "right": [
+      6,
+      6,
+      4,
+      2
+    ],
+    "results": [
+      {
+        "bridge": 2,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 4,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 6,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 8,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 10,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 12,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 14,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 16,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 18,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 20,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 22,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 24,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 26,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 28,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 30,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 32,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 34,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 36,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 38,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 40,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 42,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 44,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 46,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 48,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 50,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 52,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 54,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 56,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 58,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 60,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 62,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 64,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 66,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 68,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 70,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 72,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 74,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 76,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 78,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 80,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 82,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 84,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 86,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 88,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 90,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 92,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 94,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 96,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 98,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 100,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 102,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 104,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 106,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 108,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 110,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 112,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 114,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 116,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 118,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 120,
+        "outcome": "obstructed",
+        "prime": 7,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "bridge": 122,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 124,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 126,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 128,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 130,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {        "bridge": 132,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 134,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 136,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 138,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 140,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 142,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 144,
+        "outcome": "obstructed",
+        "prime": 5,
+        "residues": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "bridge": 146,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 148,
+        "outcome": "obstructed",
+        "prime": 3,
+        "residues": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "bridge": 150,
+        "outcome": "admissible",
+        "offsets": [
+          0,
+          6,
+          12,
+          22,
+          24,
+          174,
+          180,
+          186,
+          190,
+          192
+        ],
+        "local_residue_sizes": {
+          "2": 1,
+          "3": 2,
+          "5": 4,
+          "7": 6
+        }
+      }
+    ]
+  }
+]
