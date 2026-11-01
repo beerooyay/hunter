@@ -1,0 +1,10 @@
+{
+  "finding": "all future epoch IDs are predictable from the public manifest with zero mathematical certificates",
+  "manifest_id": "b893741ad8b25cb9c8bcdfa9481217eb25f25e2dc974cbff5eac0f9085300421",
+  "future_epoch_ids": [
+    "d20f50a8d44eedd48064b3252cb929190d0ba1f08352195358a5e0780d4e3794",
+    "9fe13a492fbfb0f53702433068f3daf562d57ae97069d64f359d93b864ae7369",
+    "a0936d5df20a6c1710df74e2885121193c3af4078f8ecf857d3a9ed6ab6dcf95"
+  ],
+  "scope": "v0.3 fixed-manifest prototype; this is NOT a forged valid evidence bundle"
+}

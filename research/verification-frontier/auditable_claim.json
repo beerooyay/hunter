@@ -1,0 +1,56 @@
+{
+  "receipt": {
+    "claim": {
+      "kind": "forced-interior-composite-pattern",
+      "offsets": [
+        0,
+        2,
+        6,
+        12,
+        14,
+        20
+      ],
+      "scope": "all bases n for which every n+h is prime and > every witness prime",
+      "witnesses": {
+        "1": 2,
+        "3": 2,
+        "4": 3,
+        "5": 2,
+        "7": 2,
+        "8": 5,
+        "9": 2,
+        "10": 3,
+        "11": 2,
+        "13": 2,
+        "15": 2,
+        "16": 3,
+        "17": 2,
+        "18": 5,
+        "19": 2
+      },
+      "unresolved": []
+    },
+    "claim_id": "f53bd9065c821c55272c1a8425ad45abdb64a8ced18774413971c38295f9778a",
+    "status": {
+      "modular_witnesses": "checked_by_independent_integer_arithmetic",
+      "lean_kernel": "NOT_RUN",
+      "human_statement_review": "PENDING",
+      "historical_novelty": "NOT_ESTABLISHED"
+    }
+  },
+  "example": {
+    "base": 17,
+    "primes": [
+      17,
+      19,
+      23,
+      29,
+      31,
+      37
+    ],
+    "all_consecutive": true,
+    "forced_interior": 15,
+    "unresolved_interior": 0,
+    "proof_status": "finite small-prime verification, NOT Lean kernel"
+  }
+}
