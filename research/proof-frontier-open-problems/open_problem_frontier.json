@@ -1,0 +1,211 @@
+{
+  "edges": [
+    {
+      "from": "b65ada8312f1c06ce8d93e7c489e6c430feb15b131634fd7ec6f7abebcbc0399",
+      "relation": "restricted_subgoal",
+      "to": "1455e8609ba446b5361a790343d9cf4fbf9930f8942ed21871874ad09f7584d9"
+    },
+    {
+      "from": "b65ada8312f1c06ce8d93e7c489e6c430feb15b131634fd7ec6f7abebcbc0399",
+      "relation": "unresolved_obligation",
+      "to": "f384155693c7ff2651889d362b2f8c69c94b4ebd7102cc32eb8e1084b84a1573"
+    },
+    {
+      "from": "eec8108f0cab65f854ee911f1686ffcb4020a0d29121ba9c7d2020c1654870fe",
+      "relation": "restricted_subgoal",
+      "to": "a6048c096cb178d3a6051fd7a807ab8c028fa8640441197e359cb9a9b07002f9"
+    },
+    {
+      "from": "eec8108f0cab65f854ee911f1686ffcb4020a0d29121ba9c7d2020c1654870fe",
+      "relation": "verified_instance_pending_kernel",
+      "to": "d86e9f7f52721200bcfb0fef7a005830db8e70acc36aa023b5d909aa6e5f6648"
+    },
+    {
+      "from": "89349540696a2d8a0839bb69f59f8c1219d85d7156024791e9ef627e67a6356c",
+      "relation": "refuted_by",
+      "to": "c7d257fa169d9fb147076a93f37d692784bd701fec704b07bf72d218b0fc1d8a"
+    },
+    {
+      "from": "89349540696a2d8a0839bb69f59f8c1219d85d7156024791e9ef627e67a6356c",
+      "relation": "domain_restriction",
+      "to": "f60ca6df2a63a5b03627fba580d42d4bc56a264a017f13e6e9b324505712d499"
+    }
+  ],
+  "evidence": {
+    "collatz": {
+      "counterexample_3_steps": 16,
+      "counterexample_to_bad_extension": 3,
+      "tested_k": 250
+    },
+    "euler": {
+      "factorization": [
+        41,
+        41
+      ],
+      "failed_n": 40,
+      "finite_restriction_tested": "0 <= n < 40",
+      "value": 1681
+    },
+    "goldbach": {
+      "bound": 30,
+      "witnesses": {
+        "10": [
+          3,
+          7
+        ],
+        "12": [
+          5,
+          7
+        ],
+        "14": [
+          3,
+          11
+        ],
+        "16": [
+          3,
+          13
+        ],
+        "18": [
+          5,
+          13
+        ],
+        "20": [
+          3,
+          17
+        ],
+        "22": [
+          3,
+          19
+        ],
+        "24": [
+          5,
+          19
+        ],
+        "26": [
+          3,
+          23
+        ],
+        "28": [
+          5,
+          23
+        ],
+        "30": [
+          7,
+          23
+        ],
+        "4": [
+          2,
+          2
+        ],
+        "6": [
+          3,
+          3
+        ],
+        "8": [
+          3,
+          5
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "b65ada8312f1c06ce8d93e7c489e6c430feb15b131634fd7ec6f7abebcbc0399",
+      "key": "collatz_all",
+      "kind": "open_conjecture",
+      "lean_name": null,
+      "proof_file": null,
+      "scope": "all positive integers",
+      "statement": "forall n>0, some iterate of T reaches 1",
+      "status": "open"
+    },
+    {
+      "id": "1455e8609ba446b5361a790343d9cf4fbf9930f8942ed21871874ad09f7584d9",
+      "key": "collatz_four_k_one",
+      "kind": "restricted_lemma",
+      "lean_name": "collatz_four_k_one_descends",
+      "proof_file": "lean/OpenProblems.lean",
+      "scope": "k>0",
+      "statement": "T^3(4k+1)=3k+1<4k+1 for all k>0",
+      "status": "lean_pending"
+    },
+    {
+      "id": "f384155693c7ff2651889d362b2f8c69c94b4ebd7102cc32eb8e1084b84a1573",
+      "key": "collatz_four_k_three",
+      "kind": "obstruction_lemma",
+      "lean_name": "collatz_four_k_three_ascends",
+      "proof_file": "lean/OpenProblems.lean",
+      "scope": "k>=0",
+      "statement": "T^3(4k+3)=18k+16>4k+3 for all k>=0",
+      "status": "lean_pending"
+    },
+    {
+      "id": "eec8108f0cab65f854ee911f1686ffcb4020a0d29121ba9c7d2020c1654870fe",
+      "key": "goldbach_all",
+      "kind": "open_conjecture",
+      "lean_name": null,
+      "proof_file": null,
+      "scope": "all even n>=4",
+      "statement": "all even n>=4 are sums of two primes",
+      "status": "open"
+    },
+    {
+      "id": "a6048c096cb178d3a6051fd7a807ab8c028fa8640441197e359cb9a9b07002f9",
+      "key": "goldbach_30",
+      "kind": "finite_lemma",
+      "lean_name": "goldbach_up_to_30",
+      "proof_file": "lean/OpenProblems.lean",
+      "scope": "4<=n<=30 even",
+      "statement": "all even 4<=n<=30 have two prime summands",
+      "status": "lean_pending"
+    },
+    {
+      "id": "d86e9f7f52721200bcfb0fef7a005830db8e70acc36aa023b5d909aa6e5f6648",
+      "key": "goldbach_100",
+      "kind": "instance_lemma",
+      "lean_name": "goldbach_at_100",
+      "proof_file": "lean/OpenProblems.lean",
+      "scope": "n=100",
+      "statement": "100=3+97, both prime",
+      "status": "lean_pending"
+    },
+    {
+      "id": "89349540696a2d8a0839bb69f59f8c1219d85d7156024791e9ef627e67a6356c",
+      "key": "euler_every_n",
+      "kind": "false_conjecture",
+      "lean_name": null,
+      "proof_file": null,
+      "scope": "all n>=0",
+      "statement": "n^2+n+41 is prime for all natural n",
+      "status": "refuted"
+    },
+    {
+      "id": "c7d257fa169d9fb147076a93f37d692784bd701fec704b07bf72d218b0fc1d8a",
+      "key": "euler_counterexample",
+      "kind": "counterexample",
+      "lean_name": "euler_polynomial_counterexample",
+      "proof_file": "lean/OpenProblems.lean",
+      "scope": "n=40",
+      "statement": "n=40 yields 1681=41*41",
+      "status": "lean_pending"
+    },
+    {
+      "id": "f60ca6df2a63a5b03627fba580d42d4bc56a264a017f13e6e9b324505712d499",
+      "key": "euler_repair",
+      "kind": "restricted_claim",
+      "lean_name": null,
+      "proof_file": null,
+      "scope": "0<=n<40",
+      "statement": "n^2+n+41 is prime for 0<=n<40",
+      "status": "experiment_only"
+    }
+  ],
+  "root": "06b0a88dfcc1dd020f28c340b6a136615512e4e31a84021349fc7c46e7d67351",
+  "schema": "praetor.scope-frontier.v1",
+  "trust_model": {
+    "cryptographic_hash": "integrity only",
+    "formal_proof": "pending until external Lean job succeeds",
+    "novelty": "unassessed",
+    "python_evidence": "test not formal proof"
+  }
+}
