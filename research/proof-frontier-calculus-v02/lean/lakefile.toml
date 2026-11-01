@@ -1,6 +1,6 @@
 name = "praetorFrontierBridge"
 version = "0.1.0"
-defaultTargets = ["ProofFrontier", "OpenProblems"]
+defaultTargets = ["ProofFrontier", "OpenProblems", "Optimality"]
 
 [[require]]
 name = "mathlib"
@@ -11,3 +11,6 @@ rev = "v4.35.0"
 name = "ProofFrontier"
 [[lean_lib]]
 name = "OpenProblems"
+
+[[lean_lib]]
+name = "Optimality"

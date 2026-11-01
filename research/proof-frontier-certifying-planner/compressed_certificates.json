@@ -1,0 +1,394 @@
+[
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 13
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 13,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 19
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 19,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 31
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 31,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 43
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 43,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 67
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 67,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "crt-adversary",
+      "p": 103
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "lower_count": 1,
+    "nogoods": [
+      {
+        "prime": 103,
+        "g_mod": 2,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "gap-words",
+      "words": [
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          6
+        ]
+      ]
+    },
+    "optimal": {
+      "bridges": [
+        24,
+        2
+      ],
+      "cost": 26
+    },
+    "lower_count": 66,
+    "nogoods": [
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 0
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 0
+      },
+      {
+        "prime": 3,
+        "g_mod": 0,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 0,
+        "h_mod": 0
+      },
+      {
+        "prime": 7,
+        "g_mod": 5,
+        "h_mod": 2
+      },
+      {
+        "prime": 7,
+        "g_mod": 4,
+        "h_mod": 2
+      },
+      {
+        "prime": 5,
+        "g_mod": 2,
+        "h_mod": 3
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 4
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 3
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 2
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "gap-words",
+      "words": [
+        [
+          2,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          6,
+          2
+        ]
+      ]
+    },
+    "optimal": {
+      "bridges": [
+        6,
+        18
+      ],
+      "cost": 24
+    },
+    "lower_count": 55,
+    "nogoods": [
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 0
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 0
+      },
+      {
+        "prime": 3,
+        "g_mod": 0,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 0,
+        "h_mod": 1
+      },
+      {
+        "prime": 5,
+        "g_mod": 2,
+        "h_mod": 1
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 2
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 1
+      }
+    ],
+    "scope": "modular admissibility only"
+  },
+  {
+    "source": {
+      "kind": "gap-words",
+      "words": [
+        [
+          4,
+          2
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          2,
+          6
+        ]
+      ]
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        10
+      ],
+      "cost": 14
+    },
+    "lower_count": 15,
+    "nogoods": [
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 2
+      },
+      {
+        "prime": 3,
+        "g_mod": 2,
+        "h_mod": 1
+      },
+      {
+        "prime": 3,
+        "g_mod": 1,
+        "h_mod": 2
+      },
+      {
+        "prime": 7,
+        "g_mod": 6,
+        "h_mod": 2
+      },
+      {
+        "prime": 5,
+        "g_mod": 4,
+        "h_mod": 4
+      },
+      {
+        "prime": 5,
+        "g_mod": 4,
+        "h_mod": 1
+      },
+      {
+        "prime": 5,
+        "g_mod": 2,
+        "h_mod": 1
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 4
+      },
+      {
+        "prime": 5,
+        "g_mod": 1,
+        "h_mod": 1
+      }
+    ],
+    "scope": "modular admissibility only"
+  }
+]

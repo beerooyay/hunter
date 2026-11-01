@@ -1,0 +1,76 @@
+[
+  {
+    "type": "bounded-polynomial-inequality",
+    "statement": "for n in 0..20, n^2 <= 7n (maybe with small fudge)",
+    "f": [
+      0,
+      0,
+      1
+    ],
+    "g": [
+      0,
+      7
+    ],
+    "domain": {
+      "min": 0,
+      "max": 20
+    },
+    "original_status": "refuted",
+    "counterexample": 8,
+    "repair": {
+      "added_constant": 260,
+      "tight_witness": 20
+    },
+    "scope": "exact bound on the finite integer domain only"
+  },
+  {
+    "type": "bounded-polynomial-inequality",
+    "statement": "n^3 <= 4n^2 on 0..15?",
+    "f": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "g": [
+      0,
+      0,
+      4
+    ],
+    "domain": {
+      "min": 0,
+      "max": 15
+    },
+    "original_status": "refuted",
+    "counterexample": 5,
+    "repair": {
+      "added_constant": 2475,
+      "tight_witness": 15
+    },
+    "scope": "exact bound on the finite integer domain only"
+  },
+  {
+    "type": "bounded-polynomial-inequality",
+    "statement": "n^2 + n <= 10n on 0..10?",
+    "f": [
+      0,
+      1,
+      1
+    ],
+    "g": [
+      0,
+      10
+    ],
+    "domain": {
+      "min": 0,
+      "max": 10
+    },
+    "original_status": "refuted",
+    "counterexample": 10,
+    "repair": {
+      "added_constant": 10,
+      "tight_witness": 10
+    },
+    "scope": "exact bound on the finite integer domain only"
+  }
+]
