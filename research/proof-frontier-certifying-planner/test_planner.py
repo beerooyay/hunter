@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 import planner
 import checker
+import slack_repair
 
 class TestPlanning(unittest.TestCase):
     @classmethod
@@ -35,6 +36,17 @@ class TestPlanning(unittest.TestCase):
             patterns=planner.motifs_from_words(chosen)
             receipt=planner.make_receipt(patterns,{'kind':'gap-words','words':chosen})
             checker.check_receipt(receipt)
+
+    def test_fudge_factor_second_domain(self):
+        receipts=json.loads((Path(__file__).parent/'slack_certificates.json').read_text())
+        for r in receipts:
+            self.assertTrue(slack_repair.verify(r))
+        self.assertEqual(receipts[0]['repair']['added_constant'],260)
+        for key, val in [('added_constant',259),('tight_witness',0)]:
+            m=copy.deepcopy(receipts[0]);m['repair'][key]=val
+            with self.assertRaises(AssertionError):slack_repair.verify(m)
+        m=copy.deepcopy(receipts[0]);m['scope']='global n >= 0'
+        with self.assertRaises(AssertionError):slack_repair.verify(m)
 
     def test_tampering(self):
         r=self.receipts[6]
