@@ -22,13 +22,11 @@ theorem even_bridge_residue_lower_bound
     by_contra hn
     have : k = 0 := by omega
     subst k
-    simp at hk
-    omega
+    simp at hk <;> omega
   have knone : k ≠ 1 := by
     intro heq
     subst k
-    simp at hk
-    omega
+    simp at hk <;> omega
   have kge : 2 ≤ k := by omega
   have hbound : 2 * p ≤ h + 2 := by
     calc
