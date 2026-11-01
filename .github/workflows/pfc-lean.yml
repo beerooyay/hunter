@@ -1,0 +1,23 @@
+name: proof-frontier-lean
+
+on:
+  pull_request:
+    paths:
+      - 'research/proof-frontier-calculus-v02/lean/**'
+      - '.github/workflows/pfc-lean.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kernel-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: research/proof-frontier-calculus-v02/lean
+          build: true
+          test: false
+          lint: false
