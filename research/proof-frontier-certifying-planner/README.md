@@ -8,6 +8,7 @@
 python3 planner.py
 python3 checker.py certificates.json
 python3 slack_repair.py
+python3 compress.py
 python3 test_planner.py
 ```
 
@@ -19,7 +20,7 @@ For any three fixed individually admissible even-offset motifs A, B, C, positive
 
 For adversarial CRT construction parameter p≥13, p≡1 mod 3 prime, the earlier general theorem predicts greedy=2p and optimum=6. Six instances p=13,19,31,43,67,103 pass, with **exactly one lower-cost path** (2,2), blocked at mod 3, independent of p. 3 ordinary motif triples also pass. 30 additional word-triplet cross-checks and adversarial mutations are in `test_planner.py`.
 
-**Lean boundary:** `Optimality.lean` formally establishes (a) the general rule that an accepted candidate plus exclusion of all cheaper candidates proves minimum cost, (b) a *specific modular feasibility surrogate* for p=13 with cost 6. It does **not** establish the infinite family in Lean, prove that the finite case's residue model is equivalent to the gigantic prime-offset construction, or prove that any particular constellation occurs among primes. The Python verifier is independent but not itself formally verified. Lean CI status must be checked per commit.
+**Lean boundary:** `Optimality.lean` formally establishes (a) the general rule that an accepted candidate plus exclusion of all cheaper candidates proves minimum cost, (b) a *specific modular feasibility surrogate* for p=13 with cost 6. It does **not** establish the infinite family in Lean, prove that the finite case's residue model is equivalent to the gigantic prime-offset construction, or prove that any particular constellation occurs among primes. The Python verifier is independent but not itself formally verified. Lean CI run 41268425838 **passed**, checking the generic certificate-to-minimum theorem and the p=13 modular surrogate. See `LEAN_STATUS.md`; the domain-specific infinite construction and Python checker are not formalized.
 
 ## Novelty and comparisons
 
@@ -32,3 +33,7 @@ Certificate integrity hashes and independent recomputation do not make arbitrary
 ## Second domain: mathematically exact fudge-factor repair
 
 The same principle applies to a completely different claim form: a finite-range polynomial inequality with an unknown nonnegative additive slack. `slack_repair.py` finds the least slack, supplies an upper-bound check over the finite domain and a tight witness showing every smaller slack fails. Example: the false claim `n² ≤ 7n` for `0≤n≤20` is repaired to `n² ≤ 7n + 260`; its tight witness is `n=20`. Another example gives `n³ ≤ 4n² + 2475` on `0≤n≤15`. Independent verification accepts all three and rejects corrupted optimum, witness, or scope. This is an **elementary, bounded, explicitly represented claim domain**. It does not parse unrestricted English, prove unbounded inequalities, or advance an open mathematical conjecture.
+
+## Modular nogood certificate compression
+
+`compress.py` converts the explicit all-cheaper-pairs list into residue-pattern exclusions. Each `(prime q, g mod q, h mod q)` is verified to *force a modular obstruction for all bridges with those residues*, and the verifier checks that the union of certified classes covers **every** lower-cost even bridge pair. This reduces 66 individually recorded exclusions to **14 modular nogoods** for the example with optimum 26, and 55 to 11 in another example. It compresses the certificate, not the current verifier's O(number of cheaper alternatives) coverage check. The set-cover heuristic isn't claimed to find the smallest possible certificate. No novelty claim: proof-carrying constraints and unsatisfiability certificates have strong prior art.
