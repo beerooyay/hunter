@@ -77,3 +77,9 @@ Why the finite check is complete: the merged tuples contain exactly 10 positions
 3. Add a typed DSL with proof-generating constructors rather than storing unverified narrative graph edges.
 4. Trial with mathematicians: compare semantic fidelity and human review time against raw AI prose or standalone Lean proofs.
 5. Only after that, evaluate whether the immutable evidence graph requires external time-stamping or consensus at all.
+
+## structural optimization: reflection symmetry
+
+For any two finite admissible offset patterns A and B, the minimum bridge between A and B equals the minimum bridge between reverse(B) and reverse(A). Reflection maps the composite offset set bijectively to its partner; for each prime p, occupied residues are transformed by a translation and sign change, preserving coverage. No probabilistic or prime-distribution assumption enters.
+
+Among 23,716 ordered four-gap pairs, there are only **11,935 symmetry orbits** (154 fixed points); evaluating just one representative per orbit saves **11,781 exact bridge evaluations (49.7%)**. The orbit-weighted histogram agrees with both full 23,716-pair computations. This is a proved structural pruning rule for the bridge search, although **end-to-end wall-clock speedup is not separately benchmarked**.
