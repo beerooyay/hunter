@@ -1,0 +1,50 @@
+{
+  "claim_id": "6b3377b9d9d740d5e0913e27f0f8cbfedc5accbd0ae34c507628e23bb61d7dcf",
+  "certificate_id": "bb653e6ff17a96c6fde599cda0a3fc060a5145a90580ff907af31f74972b7f1d",
+  "payload": {
+    "statement": {
+      "type": "minimum_three_way_bridge_cost",
+      "motifs": [
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "cost": "g+h"
+    },
+    "prime_moduli": [
+      2,
+      3,
+      5,
+      7
+    ],
+    "local_class_sizes": {
+      "2": 1,
+      "3": 1,
+      "5": 10,
+      "7": 43
+    },
+    "crt_period": 210,
+    "valid_pair_classes": 430,
+    "greedy_bridges": [
+      18,
+      26
+    ],
+    "optimal_bridges": [
+      24,
+      2
+    ],
+    "total_greedy": 44,
+    "total_optimal": 26,
+    "scope": "admissibility only, no prime occurrences or Lean proof",
+    "lean_checked": false
+  }
+}

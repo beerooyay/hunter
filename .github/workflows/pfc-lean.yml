@@ -1,0 +1,30 @@
+name: proof-frontier-lean
+
+on:
+  pull_request:
+    paths:
+      - 'research/proof-frontier-calculus-v02/lean/**'
+      - '.github/workflows/pfc-lean.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kernel-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/proof-frontier-calculus-v02/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean via elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          "$HOME/.elan/bin/lake" --version
+      - name: Resolve pinned Mathlib dependencies
+        run: "$HOME/.elan/bin/lake update"
+      - name: Download Mathlib compiled cache
+        run: "$HOME/.elan/bin/lake exe cache get"
+      - name: Kernel-check proof bridge
+        run: "$HOME/.elan/bin/lake build"
