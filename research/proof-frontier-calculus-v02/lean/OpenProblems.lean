@@ -61,12 +61,30 @@ def GoldbachConjecture : Prop :=
 
 /-- Exact finite problem, with bounded finite witness search. -/
 def GoldbachUpTo (bound : Nat) : Prop :=
-  ∀ n : Fin (bound + 1), 4 ≤ n.val → n.val % 2 = 0 →
-    ∃ p : Fin (bound + 1), ∃ q : Fin (bound + 1),
-      Nat.Prime p.val ∧ Nat.Prime q.val ∧ p.val + q.val = n.val
+  ∀ n : Nat, 4 ≤ n → n ≤ bound → n % 2 = 0 →
+    ∃ p q : Nat, Nat.Prime p ∧ Nat.Prime q ∧ p + q = n
 
+/-- Every even 4 ≤ n ≤ 30 has explicit prime witnesses; NOT global Goldbach. -/
 theorem goldbach_up_to_30 : GoldbachUpTo 30 := by
-  decide
+  intro n hlo hhi heven
+  have hcases : n = 4 ∨ n = 6 ∨ n = 8 ∨ n = 10 ∨ n = 12 ∨ n = 14 ∨ n = 16 ∨ n = 18 ∨ n = 20 ∨ n = 22 ∨ n = 24 ∨ n = 26 ∨ n = 28 ∨ n = 30 := by omega
+  rcases hcases with h | h | h | h | h | h | h | h | h | h | h | h | h | h
+  all_goals subst n
+  all_goals first
+    | exact ⟨2, 2, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 3, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 5, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 7, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨5, 7, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 11, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 13, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨5, 13, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 17, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 19, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨5, 19, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨3, 23, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨5, 23, by norm_num, by norm_num, by norm_num⟩
+    | exact ⟨7, 23, by norm_num, by norm_num, by norm_num⟩
 
 theorem goldbach_at_100 :
     ∃ p q : Nat, Nat.Prime p ∧ Nat.Prime q ∧ p + q = 100 := by
