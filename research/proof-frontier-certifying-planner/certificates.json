@@ -1,0 +1,1020 @@
+[
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 13
+    },
+    "pattern_sizes": [
+      12,
+      12,
+      13
+    ],
+    "offsets_sha256": "d6998786aa47319f950dd202f9c1fae28597726e0b6187f2c373ba8e70963a8b",
+    "greedy": {
+      "bridges": [
+        2,
+        24
+      ],
+      "cost": 26
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 19
+    },
+    "pattern_sizes": [
+      18,
+      18,
+      19
+    ],
+    "offsets_sha256": "148dc0638a30948d209ca64466a7aea1e373a04b63da494b66bac4c7eff3df92",
+    "greedy": {
+      "bridges": [
+        2,
+        36
+      ],
+      "cost": 38
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 31
+    },
+    "pattern_sizes": [
+      30,
+      30,
+      31
+    ],
+    "offsets_sha256": "ce3b9bfac7ad82b3da21af1ed90831917f3f2ee0e6cdbe629becee369c41daae",
+    "greedy": {
+      "bridges": [
+        2,
+        60
+      ],
+      "cost": 62
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 43
+    },
+    "pattern_sizes": [
+      42,
+      42,
+      43
+    ],
+    "offsets_sha256": "bd3b7026e123458d5ff35d7a7885fce8451d68228477296839f7c62a13447b05",
+    "greedy": {
+      "bridges": [
+        2,
+        84
+      ],
+      "cost": 86
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 67
+    },
+    "pattern_sizes": [
+      66,
+      66,
+      67
+    ],
+    "offsets_sha256": "ddc292a367af11a35ae06bd47565858937bce8438cd3d60a4c60074c4c903080",
+    "greedy": {
+      "bridges": [
+        2,
+        132
+      ],
+      "cost": 134
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "crt-adversary",
+      "p": 103
+    },
+    "pattern_sizes": [
+      102,
+      102,
+      103
+    ],
+    "offsets_sha256": "72cc7fcfbe194719f30c3287d6eaa2634bf38d45a86825e26bc3493eb2e2903c",
+    "greedy": {
+      "bridges": [
+        2,
+        204
+      ],
+      "cost": 206
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        2
+      ],
+      "cost": 6
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "gap-words",
+      "words": [
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          6
+        ]
+      ]
+    },
+    "pattern_sizes": [
+      3,
+      3,
+      3
+    ],
+    "offsets_sha256": "915228bd32c36e6f0e0e3e909e4c0462d83fa6618b59979843eafd7b7bd843d3",
+    "greedy": {
+      "bridges": [
+        18,
+        26
+      ],
+      "cost": 44
+    },
+    "optimal": {
+      "bridges": [
+        24,
+        2
+      ],
+      "cost": 26
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 2,
+        "modulus": 5
+      },
+      {
+        "g": 2,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 8,
+        "modulus": 5
+      },
+      {
+        "g": 8,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 2,
+        "modulus": 5
+      },
+      {
+        "g": 2,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 18,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 14,
+        "modulus": 5
+      },
+      {
+        "g": 8,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 8,
+        "modulus": 5
+      },
+      {
+        "g": 14,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 18,
+        "h": 2,
+        "modulus": 7
+      },
+      {
+        "g": 2,
+        "h": 20,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 18,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 18,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 20,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 22,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 20,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 18,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 18,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 20,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 22,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "gap-words",
+      "words": [
+        [
+          2,
+          6
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          6,
+          2
+        ]
+      ]
+    },
+    "pattern_sizes": [
+      3,
+      3,
+      3
+    ],
+    "offsets_sha256": "a142835c68160d329a72b89c6d59ee5b41eff9e3d2640e2aa20bdf23d55ac7f1",
+    "greedy": {
+      "bridges": [
+        6,
+        18
+      ],
+      "cost": 24
+    },
+    "optimal": {
+      "bridges": [
+        6,
+        18
+      ],
+      "cost": 24
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 4,        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 6,
+        "modulus": 5
+      },
+      {
+        "g": 8,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 12,
+        "modulus": 5
+      },
+      {
+        "g": 8,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 6,
+        "modulus": 5
+      },
+      {
+        "g": 14,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 18,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 18,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 20,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 18,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 16,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 14,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 12,
+        "modulus": 3
+      },
+      {
+        "g": 12,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 14,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 16,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 18,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 20,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  },
+  {
+    "protocol": "pfc-certificate-v1",
+    "problem": {
+      "kind": "gap-words",
+      "words": [
+        [
+          4,
+          2
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          2,
+          6
+        ]
+      ]
+    },
+    "pattern_sizes": [
+      3,
+      3,
+      3
+    ],
+    "offsets_sha256": "f0a68f702cbd055e56373b5ad8aa54651e3dda6f3a76d31bf4b727c6e221a9eb",
+    "greedy": {
+      "bridges": [
+        4,
+        10
+      ],
+      "cost": 14
+    },
+    "optimal": {
+      "bridges": [
+        4,
+        10
+      ],
+      "cost": 14
+    },
+    "excluded_cheaper": [
+      {
+        "g": 2,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 4,
+        "modulus": 5
+      },
+      {
+        "g": 6,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 2,
+        "modulus": 3
+      },
+      {
+        "g": 2,
+        "h": 10,
+        "modulus": 3
+      },
+      {
+        "g": 4,
+        "h": 8,
+        "modulus": 3
+      },
+      {
+        "g": 6,
+        "h": 6,
+        "modulus": 3
+      },
+      {
+        "g": 8,
+        "h": 4,
+        "modulus": 3
+      },
+      {
+        "g": 10,
+        "h": 2,
+        "modulus": 3
+      }
+    ],
+    "scope": "prime-pattern admissibility only; not actual prime occurrences"
+  }
+]
