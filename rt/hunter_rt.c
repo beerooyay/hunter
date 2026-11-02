@@ -23,6 +23,23 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
+
+/* Fail closed on missing, expired or malformed cross-search calibration. */
+uint64_t rt_shared_scale(uint64_t P, uint64_t d) {
+    const uint64_t one = (uint64_t)1 << 32;
+    FILE *f = fopen("learning/shared-scale.tsv", "r");
+    if (!f) return one;
+    unsigned long long p, den, expires; double scale;
+    uint64_t result = one;
+    while (fscanf(f, "%llu %llu %llu %lf", &p, &den, &expires, &scale) == 4) {
+        if (p == P && den == d && expires > (unsigned long long)time(NULL) &&
+            expires <= (unsigned long long)time(NULL) + 1800 &&
+            isfinite(scale) && scale >= .95 && scale <= 1.05) {
+            result = (uint64_t)llround(scale * (double)one); break;
+        }
+    }
+    fclose(f); return result;
+}
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif

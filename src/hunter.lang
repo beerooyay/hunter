@@ -19,6 +19,7 @@ import std.thread;
 // ---------------------------------------------------------------- FFI
 extern fn mml_fd_write(fd: i32, buf: *const void, n: u64) -> i64;
 extern fn rt_survivors(bits: *u64, start: u64, limit: u64, out: *u32) -> u64;
+extern fn rt_shared_scale(P: u64, d: u64) -> u64;
 extern fn rt_now_ns() -> u64;
 extern fn rt_cpu_ns() -> u64;
 extern fn rt_unix_s() -> u64;
@@ -930,6 +931,8 @@ fn grp_add(write g: Grp, m: u64, lnN: u64, q: u64, Gc: u64, eL: u64, nR: u64, nL
 
 fn run_engine(write c: Ctx, write o: Out) {
     let t0 = rt_now_ns();
+    let shared_scale = u64(1) << 32;
+    if c.gpu == 0 { shared_scale = rt_shared_scale(c.P, c.d); }
     let rec = slice(c.rec, c.recmax + 1);
     let R = slice(c.R, c.SL + 2);
     let Lf = slice(c.Lf, c.SL + 2);
@@ -999,7 +1002,8 @@ fn run_engine(write c: Ctx, write o: Out) {
             }
             let lnN = c.lnK + ln_q32(m);
             let D = mulsh(lnN, c.lprod, 62);              // lnN * prod, Q32
-            let q = divpow2(94, D);                       // 1 / (lnN * prod), Q62
+            let q_base = divpow2(94, D);
+            let q = mulsh(q_base, shared_scale, 32);       // gated shared calibration
             let omq = ONE - q;
             let nmax = nR;
             if nL > nmax { nmax = nL; }
@@ -1203,6 +1207,7 @@ fn run_engine(write c: Ctx, write o: Out) {
             pfix(o, pcal >> 2, 60, 5); tab(o); pu(o, hitcal); tab(o); pu(o, hit); tab(o);
             psec(o, dt, 3); tab(o); psci(o, scal0, 62, 6); tab(o); psci(o, q, 62, 6); tab(o);
             psci(o, vpol, 62, 6); tab(o); psec(o, mulsh(cpol, tp, 32), 3);
+            tab(o); psci(o, q_base, 62, 6); // preserve baseline for future fitting
             pb(o, 10);
             flush(o);
             k = k + 1;
@@ -2138,7 +2143,10 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     pu(b, P); pb(b, 0); pu(b, d); pb(b, 0); pu(b, m0); pb(b, 0); pu(b, M); pb(b, 0);
     pu(b, av(s, ar, 23)); pb(b, 0); ps(b, "1e9"); pb(b, 0);
     psci(b, muldiv(job_lam, u64(1) << 22, 3600), 62, 6); pb(b, 0);
-    ps(b, "15"); pb(b, 0); ps(b, "records.txt"); pb(b, 0);
+    ps(b, "15"); pb(b, 0);
+    if rt_file_size("learning/known-records.txt") >= 1000000 { ps(b, "learning/known-records.txt"); }
+    else { ps(b, "records.txt"); }
+    pb(b, 0);
     bz(t);
     if dry { ps(t, "HUNT_DRY=1"); pb(t, 0); }
     if isgpu { ps(t, "HUNTER_GPU=1"); pb(t, 0); }
@@ -2595,6 +2603,14 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
     if p1 < hend && r[p1] == 63 { q0 = p1 + 1; q1 = q0; while q1 < hend && r[q1] != 32 { q1 = q1 + 1; } }
     let body = &r[hend..rq.cap];
     let bl = rq.len - hend;
+    if !post && eqs(r, p0, p1, "/shared.json") {
+        serve_file(conn, "learning/shared.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
+    if !post && eqs(r, p0, p1, "/submissions.json") {
+        serve_file(conn, "learning/submissions.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
     if !post && eqs(r, p0, p1, "/research") {
         serve_file(conn, "research.html", "text/html; charset=utf-8", 0, 1 << 24, b, h);
         rt_close_fd(conn); return;
@@ -2636,6 +2652,13 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
         } } } }
         rt_close_fd(conn);
         return;
+    }
+    if eqs(r, p0, p1, "/api/tune") {
+        let field = kv(body, bl, "job");
+        let seconds = num_at(body, field.lo, field.hi);
+        if seconds < 20 || seconds > 3600 { reply_msg(conn, false, "choose 20 to 3600 seconds", b, h); }
+        else { s.job_secs = seconds; reply_msg(conn, true, "next-job budget updated", b, h); }
+        rt_close_fd(conn); return;
     }
     if eqs(r, p0, p1, "/api/start") {
         let had_table = rt_file_size("records.txt") >= 1000000;
@@ -2851,8 +2874,8 @@ fn cmd_probe() -> i32 {
     c.d = parse_num(arg_or(3, "210"));
     c.M = parse_num(arg_or(4, "64"));
     let target = parse_num(arg_or(5, "43"));
-    if c.P < 211 || c.P > 4001 || c.d < 1 || c.M < 1 || c.M > 256 || target < 1 || target > 100 {
-        io.eprintln("probe: P 211..4001, d dividing P#, centers 1..256, merit 1..100");
+    if c.P < 211 || c.P > 12007 || c.d < 1 || c.M < 1 || c.M > 256 || target < 1 || target > 100 {
+        io.eprintln("probe: P 211..12007, d dividing P#, centers 1..256, merit 1..100");
         return 1;
     }
     c.m0 = parse_num(arg_or(6, "10000001"));

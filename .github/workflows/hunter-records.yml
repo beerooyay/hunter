@@ -3,11 +3,15 @@ on:
   workflow_dispatch:
 jobs:
   hunt-records:
+    name: volume ${{ matrix.arm }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: ['6007.210', '6007.2310', '8009.210', '8009.2310']
     permissions:
       contents: read
-      issues: write
     steps:
       - uses: actions/checkout@v4
       - name: Install native build dependencies
@@ -24,15 +28,15 @@ jobs:
           OURC: /tmp/Praetor/target/release/ourc
           OUR_RUNTIME: /tmp/Praetor/compiler/runtime
         run: ./build.sh
-      - name: Run record-first search
+      - name: Run five-hour native volume search
         env:
-          GH_TOKEN: ${{ github.token }}
+          HUNTER_ARM: ${{ matrix.arm }}
         run: python3 -u native_campaign.py
-      - name: Preserve candidate and learner files
+      - name: Preserve results and learner files
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hunter-native-records
+          name: hunter-native-${{ matrix.arm }}-${{ github.run_attempt }}
           path: |
             FOUND.tsv
             VERIFIED.tsv
@@ -42,5 +46,5 @@ jobs:
             hunt.log
             native-status.json
             native-server.log
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn
