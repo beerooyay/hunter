@@ -10,7 +10,10 @@ def main():
     arm=os.environ['HUNTER_ARM'];run=int(os.environ['GITHUB_RUN_ID']);attempt=int(os.environ.get('GITHUB_RUN_ATTEMPT','1'))
     # Each workflow run reserves one million raw multipliers per family.
     # Retry attempts occupy a separate equally sized block.
-    base=(run*100+attempt)*10000000+int(os.environ['HUNTER_SHARD'])*1000000+1
+    shard=int(os.environ['HUNTER_SHARD'])
+    if not (1<=attempt<=9 and 0<=shard<=5):raise ValueError('unsupported retry or shard')
+    base=run*100000000+attempt*10000000+shard*1000000+1
+    if base+1000000>=2**64:raise ValueError('multiplier exceeds native word size')
     rows=[]
     for line in (ROOT/'cloud-state-template.tsv').read_text().splitlines():
         f=line.split('\t');f[4]=str(base);rows.append('\t'.join(f))
