@@ -12,6 +12,7 @@ jobs:
         arm: ['6007.210', '6007.2310', '8009.210', '8009.2310']
     permissions:
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - name: Install native build dependencies
@@ -30,6 +31,7 @@ jobs:
         run: ./build.sh
       - name: Run five-hour native volume search
         env:
+          GH_TOKEN: ${{ github.token }}
           HUNTER_ARM: ${{ matrix.arm }}
         run: python3 -u native_campaign.py
       - name: Preserve results and learner files
