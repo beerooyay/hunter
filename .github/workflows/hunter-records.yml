@@ -3,13 +3,19 @@ on:
   workflow_dispatch:
 jobs:
   hunt-records:
-    name: volume ${{ matrix.arm }}
+    name: volume ${{ matrix.arm }} · shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
     strategy:
       fail-fast: false
       matrix:
-        arm: ['6007.210', '6007.2310', '8009.210', '8009.2310']
+        include:
+          - {arm: '6007.210', shard: 0}
+          - {arm: '6007.210', shard: 1}
+          - {arm: '6007.2310', shard: 2}
+          - {arm: '6007.2310', shard: 3}
+          - {arm: '8009.210', shard: 4}
+          - {arm: '8009.2310', shard: 5}
     permissions:
       contents: read
     steps:
@@ -31,12 +37,13 @@ jobs:
       - name: Run five-hour native volume search
         env:
           HUNTER_ARM: ${{ matrix.arm }}
+          HUNTER_SHARD: ${{ matrix.shard }}
         run: python3 -u native_campaign.py
       - name: Preserve results and learner files
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hunter-native-${{ matrix.arm }}-${{ github.run_attempt }}
+          name: hunter-native-${{ matrix.arm }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             FOUND.tsv
             VERIFIED.tsv
