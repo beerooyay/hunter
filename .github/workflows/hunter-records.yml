@@ -18,6 +18,7 @@ jobs:
           - {arm: '8009.2310', shard: 5}
     permissions:
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - name: Install native build dependencies
@@ -36,6 +37,7 @@ jobs:
         run: ./build.sh
       - name: Run five-hour native volume search
         env:
+          GH_TOKEN: ${{ github.token }}
           HUNTER_ARM: ${{ matrix.arm }}
           HUNTER_SHARD: ${{ matrix.shard }}
         run: python3 -u native_campaign.py
