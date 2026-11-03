@@ -24,3 +24,45 @@ jobs:
         run: python3 -m unittest -v test_fleet_supervisor.py
       - name: No-compute budget dry run
         run: python3 fleet_supervisor.py --cores 1 --campaign-hours 1 --max-campaigns 2 --budget-core-hours 2 --dry-run
+
+  native-smoke:
+    name: Bounded native Hunter integration smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    needs: python-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo
+      - name: Build Praetor
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          cd /tmp/Praetor
+          cargo build --release -p ourc
+      - name: Build Hunter
+        env:
+          OURC: /tmp/Praetor/target/release/ourc
+          OUR_RUNTIME: /tmp/Praetor/compiler/runtime
+        run: ./build.sh
+      - name: One-worker, bounded native smoke test
+        run: |
+          python3 -u fleet_supervisor.py --cores 1 --campaign-hours 0.04 \
+            --max-campaigns 1 --budget-core-hours 0.05 \
+            --job-seconds 30 --checkpoint-minutes 0.5 \
+            --cooldown-minutes 0 --arms 6007.210
+          python3 fleet_supervisor.py --status
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-fleet-native-smoke
+          path: |
+            fleet/latest.json
+            fleet/checkpoints.jsonl
+            fleet/campaigns.jsonl
+            fleet/budget.json
+            fleet/backups/
+          retention-days: 1
+          if-no-files-found: warn
