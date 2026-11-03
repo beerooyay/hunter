@@ -33,3 +33,5 @@ python-v3/records.txt
 /fleet/
 /server.log
 /wifi-proxy.log
+
+/formal/AnchorRule/.lake/

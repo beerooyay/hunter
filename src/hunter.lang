@@ -941,8 +941,49 @@ fn grp_add(write g: Grp, m: u64, lnN: u64, q: u64, Gc: u64, eL: u64, nR: u64, nL
     g.n = i + 1;
 }
 
+// Experimental record-only center certificate. A positive result proves that
+// the center's surrounding PRP gap is below the first table-improving gap.
+// Fixed work cap; retained PRP results are reused by the ordinary nearest scan.
+struct AnchorWitness { left: u64, right: u64 }
+fn record_anchor_skip(write c: Ctx, R: slice u32, Lf: slice u32,
+    right_cache: slice mut u8, left_cache: slice mut u8, G: u64) -> AnchorWitness {
+    if G < 4 { return AnchorWitness { left: 0, right: 0 }; }
+    let bound = (G - 1) / 2;
+    let ri: u64 = 0; let li: u64 = 0;
+    while ri < R.len && u64(R[ri]) < bound / 2 { ri = ri + 1; }
+    while li < Lf.len && u64(Lf[li]) < bound / 2 { li = li + 1; }
+    let rp: u64 = 0; let lp: u64 = 0;
+    let tries: u64 = 0;
+    while tries < 64 && (rp == 0 || lp == 0) {
+        if rp == 0 && ri < R.len && u64(R[ri]) <= bound {
+            __gmpz_add_ui(c.T, c.N, u64(R[ri]));
+            if __gmpz_probab_prime_p(c.T, 1) != 0 { right_cache[ri] = 2; rp = u64(R[ri]); }
+            else { right_cache[ri] = 1; }
+            ri = ri + 1;
+        }
+        if lp == 0 && li < Lf.len && u64(Lf[li]) <= bound {
+            __gmpz_sub_ui(c.T, c.N, u64(Lf[li]));
+            if __gmpz_probab_prime_p(c.T, 1) != 0 { left_cache[li] = 2; lp = u64(Lf[li]); }
+            else { left_cache[li] = 1; }
+            li = li + 1;
+        }
+        if (rp == 0 && (ri == R.len || u64(R[ri]) > bound)) || (lp == 0 && (li == Lf.len || u64(Lf[li]) > bound)) { break; }
+        tries = tries + 1;
+    }
+    return AnchorWitness { left: lp, right: rp };
+}
+
 fn run_engine(write c: Ctx, write o: Out) {
     let t0 = rt_now_ns();
+    let use_anchors = false;
+    match process.env("HUNT_RECORD_ANCHORS") { Ok(v) => { use_anchors = v == "1" && c.gpu == 0; } Err(e) => {} }
+    let fixed_prp: u64 = 0;
+    match process.env("HUNT_FIXED_PRP_NS") { Ok(v) => { fixed_prp = parse_num(v); } Err(e) => {} }
+    if use_anchors && fixed_prp == 0 {
+        io.eprintln("experimental record anchors require HUNT_FIXED_PRP_NS; not enabled in production"); process.exit(2);
+    }
+    let anchor_skips: u64 = 0;
+    let right_cache_p = rt_alloc8(c.SL + 2); let left_cache_p = rt_alloc8(c.SL + 2);
     let shared_scale = u64(1) << 32;
     if c.gpu == 0 { shared_scale = rt_shared_scale(c.P, c.d); }
     let rec = slice(c.rec, c.recmax + 1);
@@ -1080,6 +1121,7 @@ fn run_engine(write c: Ctx, write o: Out) {
             let eL = (ONE - pw[nL]) / qs;
             let tp = c.tprp;
             if c.prp_n > 40 { tp = c.prp_t / c.prp_n; }
+            if fixed_prp > 0 { tp = fixed_prp; }
             let lamt = muldiv(c.lam, tp, 1000000000);    // improvements per test, Q62
             let sc: u64 = 0;
             let vpol: u64 = 0;
@@ -1140,6 +1182,17 @@ fn run_engine(write c: Ctx, write o: Out) {
             let t2 = rt_now_ns();
             c.ntested = c.ntested + 1;
             __gmpz_mul_ui(c.N, c.K, m);
+            let right_cache = slice(right_cache_p, nR); let left_cache = slice(left_cache_p, nL);
+            if use_anchors {
+                rt_zero(right_cache_p, nR); rt_zero(left_cache_p, nL);
+                let witness = record_anchor_skip(c, &R[0..nR], &Lf[0..nL], right_cache, left_cache, G0);
+                if witness.left > 0 && witness.right > 0 && witness.left + witness.right < G0 {
+                    anchor_skips = anchor_skips + 1;
+                    ps(o, "X\t"); pu(o, m); tab(o); pu(o, G0); tab(o); pu(o, witness.left); tab(o); pu(o, witness.right); pb(o, 10); flush(o);
+                    c.t_test = c.t_test + (rt_now_ns() - t2);
+                    k = k + 1; continue;
+                }
+            }
             let bnext: i64 = -1;
             let aprev: i64 = -1;
             let tr: u64 = 0;
@@ -1148,7 +1201,10 @@ fn run_engine(write c: Ctx, write o: Out) {
             while i < nR {
                 __gmpz_add_ui(c.T, c.N, u64(R[i]));
                 tr = tr + 1;
-                if __gmpz_probab_prime_p(c.T, 1) != 0 { bnext = i64(R[i]); break; }
+                let is_prime = false;
+                if use_anchors && right_cache[i] > 0 { is_prime = right_cache[i] == 2; }
+                else { is_prime = __gmpz_probab_prime_p(c.T, 1) != 0; }
+                if is_prime { bnext = i64(R[i]); break; }
                 i = i + 1;
             }
             let scb: u64 = 0;
@@ -1171,12 +1227,16 @@ fn run_engine(write c: Ctx, write o: Out) {
                 pcal = pcal + pw[nL];
                 let tpn = tp;
                 if c.prp_n > 40 { tpn = c.prp_t / c.prp_n; }
+                if fixed_prp > 0 { tpn = fixed_prp; }
                 if scb >= mulsh(muldiv(c.lam, tpn, 1000000000), eL, 32) {
                     jq = 0;
                     while jq < nL {
                         __gmpz_sub_ui(c.T, c.N, u64(Lf[jq]));
                         tl = tl + 1;
-                        if __gmpz_probab_prime_p(c.T, 1) != 0 { aprev = i64(Lf[jq]); break; }
+                        let is_prime = false;
+                        if use_anchors && left_cache[jq] > 0 { is_prime = left_cache[jq] == 2; }
+                        else { is_prime = __gmpz_probab_prime_p(c.T, 1) != 0; }
+                        if is_prime { aprev = i64(Lf[jq]); break; }
                         jq = jq + 1;
                     }
                     if aprev >= 0 { completed = true; }
@@ -1232,6 +1292,7 @@ fn run_engine(write c: Ctx, write o: Out) {
     // summary line (same keys as the C engine)
     ps(o, "#\tP="); pu(o, c.P); ps(o, "\td="); pu(o, c.d); ps(o, "\tm0="); pu(o, c.m0);
     ps(o, "\tM="); pu(o, c.M); ps(o, "\tSL="); pu(o, c.SL); ps(o, "\tL="); pu(o, c.L);
+    ps(o, "\tanchor_skips="); pu(o, anchor_skips);
     ps(o, "\tlambda="); psci(o, c.lam >> 2, 60, 4);
     ps(o, "\tcand="); pu(o, c.ncand); ps(o, "\ttested="); pu(o, c.ntested); ps(o, "\tcompleted="); pu(o, c.ncomplete);
     ps(o, "\tsum_score="); psci(o, c.sum_score, 40, 6);

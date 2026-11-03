@@ -1,0 +1,3 @@
+'Hunter.AnchorRule.center_gap_excluded' depends on axioms: [propext, Quot.sound]
+'Hunter.AnchorRule.qualifying_gap_survives' depends on axioms: [propext, Quot.sound]
+'Hunter.AnchorRule.rational_record_exclusion' depends on axioms: [propext, Quot.sound]

@@ -1,0 +1,22 @@
+name: Anchor rule proof and oracle tests
+on:
+  pull_request:
+    paths:
+      - 'formal/AnchorRule/**'
+      - 'experiments/endpoint_anchors.py'
+      - 'experiments/test_endpoint_anchors.py'
+      - '.github/workflows/anchor-rule.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@fe408643ea7367d8c0404a8be3975bb145f5fb64
+        with:
+          lake-package-directory: formal/AnchorRule
+      - name: Exhaustive and randomized oracle checks
+        run: python3 experiments/test_endpoint_anchors.py
