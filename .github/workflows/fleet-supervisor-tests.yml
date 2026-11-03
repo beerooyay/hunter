@@ -1,0 +1,26 @@
+name: Hunter fleet supervisor tests
+on:
+  push:
+    branches:
+      - feature/self-hosted-bounded-fleet-20261102
+    paths:
+      - fleet_supervisor.py
+      - test_fleet_supervisor.py
+      - .github/workflows/fleet-supervisor-tests.yml
+  pull_request:
+    paths:
+      - fleet_supervisor.py
+      - test_fleet_supervisor.py
+      - .github/workflows/fleet-supervisor-tests.yml
+permissions:
+  contents: read
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: python3 -m unittest -v test_fleet_supervisor.py
+      - name: No-compute budget dry run
+        run: python3 fleet_supervisor.py --cores 1 --campaign-hours 1 --max-campaigns 2 --budget-core-hours 2 --dry-run
