@@ -1,5 +1,5 @@
 {
-  "status": "interim; bounded tests still running",
+  "status": "complete: four paired cases; unpaired timeout work excluded",
   "cases": [
     {
       "case": "known6007-unfiltered",
@@ -45,5 +45,7 @@
       "anchors_record_count": 0,
       "certified_skips": 0
     }
-  ]
+  ],
+  "production_enabled": false,
+  "decision": "record sets matched, but measured CPU did not improve; keep experimental prefilter disabled"
 }

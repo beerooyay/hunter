@@ -45,11 +45,22 @@ fixture, ignoring timing-only output columns. Oracle tests, persistent-probe
 parity tests and existing learner/fleet tests also pass. A guard check confirms
 the experimental prefilter cannot be enabled without an explicit frozen price.
 
-Initial native results preserve the tested known156200 gap (merit26.4157), but
-show no gain: 121.09s baseline versus123.53s anchors. An ordinary6007#/210 range
-preserves its record set but takes61.55s versus72.70s and certifies no early skips.
-These selected microbenchmarks are not a population discovery-rate estimate.
-No default integration is justified by those measurements.
+Completed native comparisons:
+
+| Case | Baseline CPU seconds | Anchor CPU seconds | Record sets equal | Early skips |
+| --- | ---: | ---: | --- | ---: |
+| Known6007, unfiltered | 121.09 | 123.53 | yes (one historical record) | 0 |
+| Known6007, priced policy | 125.96 | 126.38 | yes (same historical record) | 0 |
+| Ordinary6007 | 61.55 | 72.70 | yes (empty) | 0 |
+| Ordinary8009 | 40.74 | 48.21 | yes (empty) | 0 |
+
+The two ordinary cases cost 102.29 CPU seconds without the prefilter and
+120.91 with it, an 18.2% increase. These are small selected comparisons, not a
+population discovery-rate estimate. The main suite reached its bounded budget;
+an unpaired case is excluded. The ordinary-only suite completed both pairs.
+No early-skip path was exercised in these native cases. Oracle tests exercise
+the pruning rule separately; matching native records here is limited evidence.
+The production activation gate failed: the experimental prefilter remains OFF.
 
 The tracked formal/AnchorRule/volume-results.json records completed paired
 measurements without full starting-prime expressions. Raw traces and exact
