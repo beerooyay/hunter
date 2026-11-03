@@ -2,7 +2,7 @@
 Predicts log endpoint elapsed time conditional on the current stopping policy.
 Unfinished gaps remain cost observations, never negative rare-gap labels.
 """
-import argparse, hashlib, json, math, os, random, re, subprocess, time
+import argparse, gzip, hashlib, json, math, os, random, re, subprocess, time
 from pathlib import Path
 from calibration import atomic_json
 ROOT=Path(__file__).resolve().parents[1]
@@ -10,8 +10,13 @@ VERSION='praetor-cost-mlp-v1'
 Q=65536
 
 def norm(seconds): return min(1.,max(0.,math.log1p(seconds)/math.log(301)))
-def dataset(paths):
+def dataset(paths, replay=None):
     rows={}; skipped=0; sources=[]
+    if replay and Path(replay).exists():
+        with gzip.open(replay,'rt') as stream:
+            for line in stream:
+                r=json.loads(line);rows[r['id']]=r
+        sources.append(dict(name=Path(replay).name,sha256=hashlib.sha256(Path(replay).read_bytes()).hexdigest()))
     for path in sorted(map(Path,paths)):
         if not path.is_file(): continue
         digest=hashlib.sha256()
@@ -35,8 +40,8 @@ def dataset(paths):
     result=list(rows.values()); random.Random(991).shuffle(result)
     return result[:200000],sources,skipped
 
-def train(paths,output,binary=ROOT/'hunter'):
-    tick=time.monotonic(); rows,sources,skipped=dataset(paths); output=Path(output);output.mkdir(parents=True,exist_ok=True)
+def train(paths,output,binary=ROOT/'hunter',replay=None):
+    tick=time.monotonic(); rows,sources,skipped=dataset(paths,replay); output=Path(output);output.mkdir(parents=True,exist_ok=True)
     if not rows: raise ValueError('no valid volume cost observations available')
     wire=str(len(rows))+'\n'+''.join(' '.join(map(str,[r['split'],*r['x'],r['y']]))+'\n' for r in rows)
     result=subprocess.run([str(binary),'brain-train'],input=wire,text=True,capture_output=True,timeout=120,check=True)

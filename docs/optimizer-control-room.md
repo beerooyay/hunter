@@ -85,3 +85,27 @@ The pinned compiler/build and initial regression suite passed; all eight volume
 workers entered their first search segment. Completed campaign evaluation remains
 pending at this checkpoint. Local expanded tests additionally check native frozen
 inference against an integer reference and one-shot dispatch failure durability.
+
+## Five-hour campaign update
+
+The UI now selects 30 or 300 minutes. Five-hour evaluations use ten 30-minute
+segments, 120-second native jobs and a 340-minute hard job timeout. Checkpoints
+show measured native process-tree CPU samples, newly tested centers and tests per
+sampled CPU-hour. These samples exclude the final process-shutdown CPU; compare
+like-for-like hardware/policies rather than treating counts as proof of a speedup.
+Each worker records its effective CPU affinity and OS, and the exact comparison
+table hash. The refreshed table includes public records and independently checked
+local/cloud candidates. No neural decision or anchor prefilter is enabled.
+
+The neural audit additionally checks that changing training labels changes
+weights while held-out labels cannot do so, and verifies frozen native inference
+against an independent integer reference. Cumulative training retains 93,839
+historical replay examples plus the first campaign's 1,879 observations. The old
+and cumulative models are frozen before the next campaign; their errors are
+compared prospectively before retraining. This tests learning across campaigns,
+not whether the model saves CPU or improves record yield.
+
+`launch_control.py` also starts a read-only Wi-Fi view on port 8768. It strips the
+local control token and rejects all POST requests; controls remain on Mac loopback
+8767. The Mac must remain awake for either view to update, while GitHub workers
+continue independently. This is a private LAN view, not an internet deployment.

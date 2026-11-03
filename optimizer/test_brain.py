@@ -47,6 +47,18 @@ class BrainTests(unittest.TestCase):
             c.schedule_check();c.schedule_check()
             self.assertEqual(launch.call_count,1)
             self.assertEqual(c.read(Path(tmp)/'schedule.json')['status'],'failed')
+    def test_training_labels_change_weights(self):
+        rows=[[0,65536,20000,10000,15000,30000,20000,10000]]*200
+        other=[[*r[:-1],50000] for r in rows]
+        self.assertNotEqual(self.native(rows).splitlines()[-1],self.native(other).splitlines()[-1])
+    def test_replay_keeps_observations_and_splits(self):
+        import gzip
+        row=dict(id='6007:210:123456',block='6007:210:12',split=2,x=[65536,1,2,3,4,5],y=10,completed=False,hit=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'replay.gz'
+            with gzip.open(p,'wt') as f:f.write(json.dumps(row)+'\n')
+            rows,_,_=dataset([],replay=p)
+            self.assertEqual(rows,[row])
     def test_reject_bad_input(self):
         p=subprocess.run([str(ROOT/'hunter'),'brain-train'],input='1\n0 999999 0 0 0 0 0 0\n',text=True,capture_output=True)
         self.assertNotEqual(p.returncode,0)

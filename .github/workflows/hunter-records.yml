@@ -7,6 +7,11 @@ on:
         type: choice
         options: ['8', '10']
         default: '8'
+      duration:
+        description: Bounded campaign duration
+        type: choice
+        options: ['30', '300']
+        default: '300'
 permissions:
   contents: read
 concurrency:
@@ -53,7 +58,7 @@ jobs:
   volume:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 340
     strategy:
       fail-fast: false
       max-parallel: 10
@@ -65,38 +70,135 @@ jobs:
         with:
           name: fleet-native
       - run: chmod +x hunter
-      - name: Volume segment 1 of 3
+      - name: Volume checkpoint 1 of 10
+        if: inputs.duration == '300' || 1 <= 3
         env:
           HUNTER_SHARD: ${{ matrix.shard }}
-        run: python3 -u fleet_campaign.py --seconds 600
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (inputs.duration == '300' || 1 <= 3)
         with:
           name: fleet-${{ github.run_id }}-${{ matrix.shard }}-1
           path: fleet-output/
-          retention-days: 7
+          retention-days: 2
           if-no-files-found: warn
-      - name: Volume segment 2 of 3
+      - name: Volume checkpoint 2 of 10
+        if: inputs.duration == '300' || 2 <= 3
         env:
           HUNTER_SHARD: ${{ matrix.shard }}
-        run: python3 -u fleet_campaign.py --seconds 600
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (inputs.duration == '300' || 2 <= 3)
         with:
           name: fleet-${{ github.run_id }}-${{ matrix.shard }}-2
           path: fleet-output/
-          retention-days: 7
+          retention-days: 2
           if-no-files-found: warn
-      - name: Volume segment 3 of 3
+      - name: Volume checkpoint 3 of 10
+        if: inputs.duration == '300' || 3 <= 3
         env:
           HUNTER_SHARD: ${{ matrix.shard }}
-        run: python3 -u fleet_campaign.py --seconds 600
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (inputs.duration == '300' || 3 <= 3)
         with:
           name: fleet-${{ github.run_id }}-${{ matrix.shard }}-3
           path: fleet-output/
-          retention-days: 7
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 4 of 10
+        if: inputs.duration == '300' || 4 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 4 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-4
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 5 of 10
+        if: inputs.duration == '300' || 5 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 5 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-5
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 6 of 10
+        if: inputs.duration == '300' || 6 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 6 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-6
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 7 of 10
+        if: inputs.duration == '300' || 7 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 7 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-7
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 8 of 10
+        if: inputs.duration == '300' || 8 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 8 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-8
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 9 of 10
+        if: inputs.duration == '300' || 9 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 9 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-9
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 10 of 10
+        if: inputs.duration == '300' || 10 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 10 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-10
+          path: fleet-output/
+          retention-days: 2
           if-no-files-found: warn
   brain:
     needs: [build, volume]
@@ -120,7 +222,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           from optimizer.brain import train
-          train(list(Path('fleet-input').rglob('gaps.tsv')),Path('brain-output'))
+          train(list(Path('fleet-input').rglob('gaps.tsv')),Path('brain-output'),replay=Path('optimizer/replay.jsonl.gz'))
           PY
       - uses: actions/upload-artifact@v4
         if: always()

@@ -25,7 +25,7 @@ def gh(*args,raw=False):
 def api(path,*args,raw=False):return gh('api',f'repos/{REPO}/{path}',*args,raw=raw)
 
 def extract_snapshot(blob,dest):
-    allowed={'checkpoint.json','gaps.tsv','jobs.tsv','state.tsv','FOUND.tsv','VERIFIED.tsv','hunt.log','native-status.json','summary.json','model.json','prospective.json'}
+    allowed={'checkpoint.json','gaps.tsv','jobs.tsv','state.tsv','FOUND.tsv','VERIFIED.tsv','hunt.log','native-status.json','summary.json','model.json','prospective.json','learning-check.json','candidate-evaluation.json'}
     with zipfile.ZipFile(io.BytesIO(blob)) as z:
         if sum(x.file_size for x in z.infolist())>150_000_000:raise ValueError('artifact exceeds import limit')
         entries=[x for x in z.infolist() if x.filename in allowed]
@@ -36,12 +36,13 @@ def extract_snapshot(blob,dest):
         atomic_json(dest/'receipt.json',dict(imported=time.time(),sha256=hashes))
 
 def sync():
-    allruns=api('actions/runs?per_page=30')['workflow_runs']
+    allruns=api('actions/workflows/'+WORKFLOW+'/runs?per_page=6')['workflow_runs']
     runs=[r for r in allruns if r.get('path')=='.github/workflows/'+WORKFLOW][:6]
     view=[]
     for r in runs:
         rid=r['id']; jobs=api(f'actions/runs/{rid}/jobs?per_page=100')['jobs']
         artifacts=api(f'actions/runs/{rid}/artifacts?per_page=100')['artifacts']
+        if len(artifacts)==100:artifacts+=api(f'actions/runs/{rid}/artifacts?per_page=100&page=2')['artifacts']
         for a in artifacts:
             if a['expired'] or a['size_in_bytes']>60_000_000 or not a['name'].startswith(('fleet-','hunter-native')) or a['name']=='fleet-native':continue
             dest=STORE/'imports'/str(rid)/str(a['id'])
@@ -56,15 +57,15 @@ def sync():
     atomic_json(STORE/'cloud.json',payload)
     return payload
 
-def launch(workers):
-    if workers not in (8,10):raise ValueError('choose 8 or 10 workers')
+def launch(workers,duration=300):
+    if workers not in (8,10) or duration not in (30,300):raise ValueError('choose 8 or 10 workers; 30 or 300 minutes')
     repo=gh('repo','view',REPO,'--json','isPrivate')
     if repo['isPrivate']:raise ValueError('free-only control supports this public repository only')
     runs=api('actions/workflows/'+WORKFLOW+'/runs?per_page=30')['workflow_runs']
     if any(r['status']!='completed' for r in runs):raise ValueError('a fleet campaign is already active or queued')
-    api('actions/workflows/'+WORKFLOW+'/dispatches','-X','POST','-f','ref='+REF,'-f',f'inputs[workers]={workers}')
-    atomic_json(STORE/'last-launch.json',dict(at=time.time(),workers=workers,ref=REF))
-    return dict(message=f'{workers} workers requested; GitHub may queue capacity. Refresh shortly.')
+    api('actions/workflows/'+WORKFLOW+'/dispatches','-X','POST','-f','ref='+REF,'-f',f'inputs[workers]={workers}','-f',f'inputs[duration]={duration}')
+    atomic_json(STORE/'last-launch.json',dict(at=time.time(),workers=workers,duration_minutes=duration,ref=REF))
+    return dict(message=f'{workers} workers requested for {duration} minutes; GitHub may queue capacity. Refresh shortly.')
 
 def cancel(runid):
     run=api(f'actions/runs/{int(runid)}')
@@ -74,7 +75,7 @@ def cancel(runid):
 
 def training():
     paths=[ROOT/'gaps.tsv',*sorted((STORE/'imports').glob('*/*/gaps.tsv'))]
-    return train(paths,ROOT/'learning/brain')
+    return train(paths,ROOT/'learning/brain',replay=ROOT/'optimizer/replay.jsonl.gz')
 
 def task(name,fn):
     global CURRENT
@@ -95,7 +96,7 @@ def schedule_check():
         # Claim before sending: a crash cannot silently launch a duplicate.
         schedule['status']='claimed';atomic_json(STORE/'schedule.json',schedule)
         try:
-            result=launch(schedule['workers']);schedule.update(status='launched',result=result)
+            result=launch(schedule['workers'],schedule.get('duration',300));schedule.update(status='launched',result=result)
         except Exception as e:schedule.update(status='failed',error=str(e))
         atomic_json(STORE/'schedule.json',schedule)
 
@@ -113,7 +114,9 @@ def background():
 def status():
     prospective=[read(p) for p in (STORE/'imports').glob('*/*/prospective.json')]
     prospective.sort(key=lambda x:x.get('updated',0),reverse=True)
-    return dict(prospective=prospective[:3],cloud=read(STORE/'cloud.json'),brain=read(ROOT/'learning/brain/summary.json'),experiments=read(ROOT/'optimizer/experiments.json'),task=read(STORE/'task.json'),schedule=read(STORE/'schedule.json'),token=TOKEN,ref=REF)
+    checks=[read(p) for p in (STORE/'imports').glob('*/*/learning-check.json')]
+    checks.sort(key=lambda x:x.get('updated',0),reverse=True)
+    return dict(learning_checks=checks[:3],prospective=prospective[:3],cloud=read(STORE/'cloud.json'),brain=read(ROOT/'learning/brain/summary.json'),experiments=read(ROOT/'optimizer/experiments.json'),task=read(STORE/'task.json'),schedule=read(STORE/'schedule.json'),token=TOKEN,ref=REF)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*a):pass
@@ -158,12 +161,14 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(body or b'{}');action=self.path.rsplit('/',1)[1]
             if action=='sync':result=task('cloud sync',sync)
             elif action=='train':result=task('Praetor training',training)
-            elif action=='launch':result=task('launch fleet',lambda:launch(int(data['workers'])))
+            elif action=='launch':result=task('launch fleet',lambda:launch(int(data['workers']),int(data.get('duration',300))))
             elif action=='stop':result=task('stop fleet',lambda:cancel(int(data['run'])))
             elif action=='schedule':
                 at=float(data['at']);workers=int(data['workers'])
                 if not(time.time()+30<=at<=time.time()+172800) or workers not in (8,10):raise ValueError('schedule within 48 hours; 8 or 10 workers')
-                result=dict(at=at,workers=workers,status='pending');atomic_json(STORE/'schedule.json',result)
+                duration=int(data.get('duration',300))
+                if duration not in (30,300):raise ValueError('duration must be 30 or 300 minutes')
+                result=dict(at=at,workers=workers,duration=duration,status='pending');atomic_json(STORE/'schedule.json',result)
             elif action=='unschedule':result={'status':'cancelled'};atomic_json(STORE/'schedule.json',result)
             else:raise ValueError('unknown action')
             self.send(result)

@@ -2,7 +2,7 @@
 import os,subprocess,sys,urllib.request
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
-for port,args,logname in [(8766,[str(ROOT/'hunter'),'serve','8766'],'server.log'),(8767,[sys.executable,str(ROOT/'control_room.py')],'control.log')]:
+for port,args,logname in [(8766,[str(ROOT/'hunter'),'serve','8766'],'server.log'),(8767,[sys.executable,str(ROOT/'control_room.py')],'control.log'),(8768,[sys.executable,str(ROOT/'phone_view.py')],'phone.log')]:
     try:
         urllib.request.urlopen(f'http://127.0.0.1:{port}/'+('api/status' if port==8766 else 'control/status'),timeout=2)
         print(f'{port}: already responding');continue

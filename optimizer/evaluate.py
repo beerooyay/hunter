@@ -17,4 +17,8 @@ def evaluate(paths,output,model_path=ROOT/'optimizer/seed-model.json'):
     result=dict(updated=time.time(),model_id=model['id'],n=len(rows),baseline_mse=base,calibrated_mse=cal,model_mse=error,gain_vs_calibrated=1-error/cal if cal else None,sources=sources,note='Frozen historical model; entirely fresh campaign, no refitting before evaluation. Different hardware may shift elapsed costs. No measured production speedup.')
     atomic_json(Path(output),result);return result
 
-if __name__=='__main__':evaluate(list(Path('fleet-input').rglob('gaps.tsv')),Path('brain-output/prospective.json'))
+if __name__=='__main__':
+    paths=list(Path('fleet-input').rglob('gaps.tsv'))
+    original=evaluate(paths,Path('brain-output/prospective.json'))
+    candidate=evaluate(paths,Path('brain-output/candidate-evaluation.json'),ROOT/'optimizer/candidate-model.json')
+    atomic_json(Path('brain-output/learning-check.json'),dict(updated=time.time(),n=original['n'],original_mse=original['model_mse'],candidate_mse=candidate['model_mse'],candidate_gain=1-candidate['model_mse']/original['model_mse'],note='Both frozen before this campaign; lower error does not establish compute savings.'))
