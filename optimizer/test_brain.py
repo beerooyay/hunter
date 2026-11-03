@@ -29,6 +29,24 @@ class BrainTests(unittest.TestCase):
             with zipfile.ZipFile(blob,'w') as z:z.writestr('../oops','bad');z.writestr('gaps.tsv','data')
             dest=Path(tmp)/'snapshot';extract_snapshot(blob.getvalue(),dest)
             self.assertFalse((Path(tmp)/'oops').exists());self.assertEqual((dest/'gaps.tsv').read_text(),'data')
+    def test_native_frozen_inference_matches_integer_reference(self):
+        from optimizer.brain import Q
+        model=json.loads((ROOT/'optimizer/seed-model.json').read_text())
+        weights=model['weights'];x=[Q,25000,5960,16000,32000,18000]
+        def div(a,b):return (abs(a)//b)*(-1 if a<0 else 1)
+        h=[max(0,min(2*Q,sum(div(weights[j*6+k]*x[k],Q) for k in range(6)))) for j in range(8)]
+        want=max(0,min(Q,x[5]+weights[56]+sum(div(weights[48+j]*h[j],Q) for j in range(8))))
+        wire='1\n'+' '.join(map(str,[2,*x,0]))+'\n'+' '.join(str(v%(2**64)) for v in weights)+'\n'
+        p=subprocess.run([str(ROOT/'hunter'),'brain-train','predict'],input=wire,text=True,capture_output=True,check=True)
+        self.assertEqual(int(p.stdout.splitlines()[0].split('\t')[2]),want)
+    def test_ambiguous_scheduled_dispatch_is_not_retried(self):
+        from unittest.mock import patch
+        import control_room as c
+        with tempfile.TemporaryDirectory() as tmp,patch.object(c,'STORE',Path(tmp)),patch.object(c,'launch',side_effect=RuntimeError('ambiguous network failure')) as launch:
+            c.atomic_json(Path(tmp)/'schedule.json',dict(status='pending',at=1,workers=8))
+            c.schedule_check();c.schedule_check()
+            self.assertEqual(launch.call_count,1)
+            self.assertEqual(c.read(Path(tmp)/'schedule.json')['status'],'failed')
     def test_reject_bad_input(self):
         p=subprocess.run([str(ROOT/'hunter'),'brain-train'],input='1\n0 999999 0 0 0 0 0 0\n',text=True,capture_output=True)
         self.assertNotEqual(p.returncode,0)

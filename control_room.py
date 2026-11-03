@@ -130,6 +130,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith('/control/export/'):
             kind=path.rsplit('/',1)[1]
             if kind=='brain':data=read(ROOT/'learning/brain/summary.json')
+            elif kind=='model':data=read(ROOT/'learning/brain/model.json')
             elif kind=='fleet':data=read(STORE/'cloud.json')
             elif kind=='experiments':data=read(ROOT/'optimizer/experiments.json')
             elif kind=='records':

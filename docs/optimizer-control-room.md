@@ -79,3 +79,9 @@ oracle/certificate tests, and paired whole-cost improvement on unseen ranges.
 A Lean proof establishes its stated proposition, not speed, oracle truth or code
 refinement. The registry deliberately cannot enable arbitrary native features.
 The anchor experiment remains a useful rejected case. There is no novelty claim.
+
+Initial Linux integration run: https://github.com/beerooyay/hunter/actions/runs/41579978533 .
+The pinned compiler/build and initial regression suite passed; all eight volume
+workers entered their first search segment. Completed campaign evaluation remains
+pending at this checkpoint. Local expanded tests additionally check native frozen
+inference against an integer reference and one-shot dispatch failure durability.
