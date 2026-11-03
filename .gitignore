@@ -35,3 +35,8 @@ python-v3/records.txt
 /wifi-proxy.log
 
 /formal/AnchorRule/.lake/
+
+/control.log
+/fleet-output/
+/fleet-input/
+/brain-output/

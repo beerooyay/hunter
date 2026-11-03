@@ -3069,6 +3069,7 @@ fn cmd_probe(persistent: bool) -> i32 {
 fn main() -> i32 {
     let cmd = arg_or(1, "serve");
     if cmd == "serve" { return cmd_serve(); }
+    if cmd == "brain-train" { return cmd_brain(); }
     if cmd == "hunt" { return cmd_hunt(); }
     if cmd == "bench" { return cmd_bench(); }
     if cmd == "probe" { return cmd_probe(false); }

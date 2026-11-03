@@ -438,3 +438,9 @@ void rt_pattern(uint64_t m, const uint32_t *right, uint64_t nr,
 uint64_t rt_survivors(const uint64_t *bits, uint64_t start, uint64_t limit, uint32_t *out) {
     return hunter_survivors(bits, start, limit, out);
 }
+
+/* Strict numeric transport only: model computation lives in src/brain.lang. */
+int rt_brain_row(uint64_t *row, uint64_t n) {
+    for(uint64_t i=0;i<n;i++){ unsigned long long v; if(scanf("%llu", &v)!=1) return 0; row[i]=v; }
+    return 1;
+}

@@ -179,6 +179,7 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
 input[type="number"],input[type="text"],select{color:var(--tx);background:#0d151a;border:1px solid var(--edge);border-radius:12px;padding:8px 10px;font:inherit;max-width:100%}
 button,.field{border-radius:12px}.top{border-radius:var(--r)}.hd{flex-wrap:wrap;gap:8px}.guide{color:var(--tx2);font-size:12px;line-height:1.6;margin:12px 0}.guide summary{cursor:pointer;color:var(--tx)}
 </style>
+<link rel="stylesheet" href="/frontier.css">
 </head>
 <body>
 <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -201,6 +202,24 @@ button,.field{border-radius:12px}.top{border-radius:var(--r)}.hd{flex-wrap:wrap;
     </div>
   </header>
 
+
+<div class="frontier-grid" id="frontier">
+<section class="glass card"><div class="hd"><h2>fleet / execution</h2><span class="sub">bounded evaluation campaigns</span></div>
+<div class="metrics-row"><div><strong id="cloud-count">—</strong><span>running jobs</span></div><div><strong id="cloud-queued">—</strong><span>queued jobs</span></div><div><strong id="cloud-sync-age">—</strong><span>cloud sync</span></div></div>
+<div class="control-line"><label>workers <select id="fleet-size"><option value="8">8 volume + shared trainer</option><option value="10">10 volume + shared trainer</option></select></label><button id="fleet-launch">launch 30 min evaluation</button><button id="fleet-sync" class="ghost">sync</button></div>
+<p class="frontier-note">Job state refreshes every 90 seconds. Measurements arrive at ~10-minute checkpoints. Training follows collection; the model does not change search decisions.</p>
+<div id="fleet-runs"></div>
+<details><summary>schedule one launch</summary><div class="control-line"><input type="datetime-local" id="schedule-at" aria-label="Launch date and time"><button id="fleet-schedule">schedule</button><button id="fleet-unschedule" class="ghost">clear</button></div><p class="frontier-note">Within 48 hours. This Mac and control room must remain awake. One bounded launch; no automatic repeat.</p><p id="schedule-state" class="frontier-note"></p></details>
+</section>
+<section class="glass card"><div class="hd"><h2>brain / cost model</h2><span class="sub">native Praetor neural network</span></div>
+<div class="metrics-row"><div><strong id="brain-count">—</strong><span>deduplicated observations</span></div><div><strong id="brain-mode">—</strong><span>deployment mode</span></div><div><strong id="brain-version" style="font-size:13px">—</strong><span>dataset version</span></div></div>
+<p id="brain-details" class="frontier-note"></p><div class="scroll"><table><thead><tr><th>split</th><th>rows</th><th>baseline error</th><th>calibrated error</th><th>model error</th><th>gain</th></tr></thead><tbody id="brain-metrics"></tbody></table></div>
+<p class="frontier-note">Error is mean squared error in normalized log elapsed time. Lower is better. Prediction gain is not a compute speedup. Nearby multiplier blocks stay in the same split. Incomplete gaps are cost observations, not failed record labels.</p><p id="brain-prospective" class="frontier-note"></p><div class="control-line"><button id="brain-train">train on collected traces</button></div>
+</section>
+<section class="glass card wide"><div class="hd"><h2>ideas / evidence / promotion</h2><span class="sub">each change has a scope, test and adoption gate</span></div><div class="scroll"><table><thead><tr><th>experiment</th><th>status</th><th>evidence</th></tr></thead><tbody id="experiment-rows"></tbody></table></div>
+<div class="control-line export-row"><span class="muted">export</span><a href="/control/export/records">candidate TSV</a><a href="/control/export/fleet">fleet JSON</a><a href="/control/export/brain">model evaluation</a><a href="/control/export/experiments">experiment registry</a></div><p class="frontier-note">Candidate exports include local and imported cloud findings; deduplicate and reverify before submission. Probable-prime checks are not primality certificates.</p><div id="control-task" class="frontier-status" role="status">connecting to control room…</div>
+</section></div>
+
   <details id="research" class="glass" style="padding:20px;margin-bottom:18px"><summary style="cursor:pointer;font-size:17px">research lab · high merits & shared learning</summary><h1>the long-shot lab</h1>
 <p>one persistent worker exploring merits 25, 30, 40, and 50. learning where to search is real; extreme-tail predictions still need evidence.</p>
 <p class="status" id="lab-status">connecting…</p><p id="lab-phase"></p><p id="lab-error" role="status"></p>
@@ -209,7 +228,7 @@ button,.field{border-radius:12px}.top{border-radius:var(--r)}.hd{flex-wrap:wrap;
 <section><h2>ordinary hunter calibration</h2><p>right-side prime successes divided by predicted successes across tested survivors. the audit below uses uncorrected probabilities. shared corrections require independent held-out support from both searches.</p><div class="scroll"><table><thead><tr><th>family</th><th>centers</th><th>measured / model</th><th>held-out gain (nats)</th></tr></thead><tbody id="lab-cal"></tbody></table></div><small>good aggregate calibration does not validate the merit 30–50 tail.</small></section>
 <section><h2>verified lab discoveries</h2><div class="scroll"><table><tbody id="lab-finds"></tbody></table></div></section><section><h2>shared evidence</h2><p id="lab-sharedStatus">loading shared memory…</p><p>verified finds from either search update the comparison table used by both. ordinary-search observations inform lab exploration; survivor calibration transfers only when it improves held-out predictions in both domains. each scheduler retains its own cost and yield model.</p><div class="scroll"><table><thead><tr><th>family</th><th>main centers</th><th>completed</th><th>best merit</th><th>≥25 observed</th><th>shared scale</th></tr></thead><tbody id="lab-bands"></tbody></table></div><small>counts are censored by the ordinary stopping policy. they are not unbiased tail probabilities or compute-adjusted success rates.</small></section>
 <section><h2>public record context</h2><p><a href="https://github.com/primegap-list-project/prime-gap-list/commit/140cb8ed5abf3b281c4bcee8837ee48b60ce3da9">your accepted batch: 53 improvements + 8 new gaps</a> · 110 entries credited to b. rouyea in this snapshot.</p><p>the public best is merit 42.5402 at 146 digits (337#/210); merit 42.5192 occurs at 611 digits (1439#/2310). these selected records support exploring smaller families too. they do not measure discovery rate: unsuccessful searches and compute exposure are absent.</p><small>public snapshot: 140cb8e. a merit target of 50 is experimental, not a forecast.</small></section>
-<section><h2>what survives a restart</h2><p>ordinary praetor keeps family performance and multiplier positions. the lab keeps its recipe history, trial outcomes, replayable survivor patterns, and independently rechecked finds in a local database.</p><p>both workers currently run on the mac. opening this page on a phone does not move the computation to the phone or to the cloud.</p><small>verification uses probable-prime endpoint checks and next-prime checks; these are not primality certificates.</small></section>
+<section><h2>what survives a restart</h2><p>ordinary praetor keeps family performance and multiplier positions. the lab keeps its recipe history, trial outcomes, replayable survivor patterns, and independently rechecked finds in a local database.</p><p>the local lab runs on the mac. the fleet panel reports separate GitHub evaluation workers; checkpoints retain their source and run identity.</p><small>verification uses probable-prime endpoint checks and next-prime checks; these are not primality certificates.</small></section>
 </details>
 <div class="glass" style="padding:12px 20px;margin-bottom:16px">live tuning · next-job budget <input id="liveJob" type="number" min="20" max="3600" value="600" style="width:90px"> seconds <button id="applyLive">apply</button><span class="muted"> takes effect as workers start their next jobs; existing jobs finish normally</span></div>
 <div class="kpis">
@@ -609,5 +628,5 @@ async function shared(){try{
  }catch(e){$('sharedStatus').textContent=e.message}}
 refresh();shared();setInterval(refresh,10000);setInterval(shared,30000);
 
-})();document.getElementById('applyLive').onclick=()=>post('/api/tune',{job:document.getElementById('liveJob').value});</script></body>
+})();document.getElementById('applyLive').onclick=()=>post('/api/tune',{job:document.getElementById('liveJob').value});</script><script src="/control.js"></script></body>
 </html>

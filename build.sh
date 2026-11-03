@@ -10,7 +10,8 @@ if ! command -v "$OURC" >/dev/null 2>&1; then
   echo "can't find the praetor compiler (ourc). install it first -- see README.md, step 1."; exit 1
 fi
 # praetor -> llvm ir (this also unpacks the toolchain's runtime C files on first use)
-"$OURC" src/hunter.lang --show-llvm > build/hunter.ll 2> build/ourc.log || true
+cat src/hunter.lang src/brain.lang > build/hunter-combined.lang
+"$OURC" build/hunter-combined.lang --show-llvm > build/hunter.ll 2> build/ourc.log || true
 if ! grep -q "define" build/hunter.ll; then cat build/ourc.log; exit 1; fi
 RT=${OUR_RUNTIME:-}
 if [ -z "$RT" ]; then

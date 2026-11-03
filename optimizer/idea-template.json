@@ -1,0 +1,14 @@
+{
+  "id": "replace-with-stable-id",
+  "name": "Describe the computation to avoid",
+  "status": "proposed",
+  "scope": "Which finite search and eligible results must be preserved?",
+  "hypothesis": "What reusable evidence could avoid which expensive operation?",
+  "features_available_before_decision": [],
+  "proof_obligations": [],
+  "baseline": "Pin implementation, input data, record table and policy",
+  "evaluation": "Paired disjoint held-out ranges, whole CPU cost including overhead",
+  "gate": "Zero required-result mismatches and reproducible total-cost improvement",
+  "counterexamples": [],
+  "evidence": []
+}
