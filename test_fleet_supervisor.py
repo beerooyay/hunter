@@ -44,6 +44,8 @@ class FleetTests(unittest.TestCase):
             (p / "state.tsv").write_text("state")
             archive = backup(p, p / "fleet", 1, {"example": True})
             self.assertTrue(archive.exists())
+            with tarfile.open(archive) as tf:
+                self.assertIn("fleet/budget.json",tf.getnames())
 
     def test_research_wal_backup_is_consistent_and_checksummed(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -61,7 +61,8 @@ and comparison against a fresh public table are separate.
 
 ## Backups
 
-Each archive now includes ordinary state/logs/configuration and learning files,
+Each archive now includes ordinary state/logs/configuration, the conservative
+fleet budget ledger and reporting metadata, and learning files,
 including shared tables, research trials, patterns and future SQLite caches.
 Every SQLite database is copied through SQLite online backup, normalized to a
 standalone rollback-journal file, and checked with integrity_check. WAL/SHM and

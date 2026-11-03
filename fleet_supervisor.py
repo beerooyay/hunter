@@ -153,6 +153,7 @@ def backup(root: Path, data: Path, campaign: int, metadata: dict) -> Path:
         with tempfile.TemporaryDirectory(dir=out, prefix="snapshot-") as staging:
             staging = Path(staging)
             sources = [root / name for name in FILES]
+            sources += [data / name for name in ("budget.json","campaigns.jsonl","latest.json","issue.json")]
             learning = root / "learning"
             if learning.exists():
                 sources += [p for p in learning.rglob("*") if p.is_file()
@@ -226,8 +227,6 @@ def github_report(repo: str, token: str, issue: int | None, summary: dict,
 
 
 def stop_group(proc: subprocess.Popen, grace: int = 20) -> None:
-    if proc.poll() is not None:
-        return
     try:
         os.killpg(proc.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -237,6 +236,9 @@ def stop_group(proc: subprocess.Popen, grace: int = 20) -> None:
     except subprocess.TimeoutExpired:
         os.killpg(proc.pid, signal.SIGKILL)
         proc.wait(timeout=10)
+    # A crashed server can leave descendants in its process group.
+    try: os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError: pass
 
 
 def parse_args() -> argparse.Namespace:
@@ -321,6 +323,9 @@ def main() -> int:
     issue = read_json(data / "issue.json").get("number") if args.publish else None
     if args.publish and not token:
         print("warning: --publish set without GH_TOKEN; only local 15-minute harvests", flush=True)
+    def terminate(signum, frame):
+        raise KeyboardInterrupt("supervisor termination requested")
+    signal.signal(signal.SIGTERM, terminate)
     previous_measured = float(state.get("measured_cpu_hours",0))
     self_cpu_baseline = time.process_time()
     child_usage = resource.getrusage(resource.RUSAGE_CHILDREN)
