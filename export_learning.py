@@ -17,9 +17,9 @@ def export(destination):
     with tempfile.TemporaryDirectory() as temp:
         bundle=Path(temp)/"hunter"
         bundle.mkdir()
-        for name in ("src","rt","docs"):
+        for name in ("src","rt","docs","experiments"):
             shutil.copytree(ROOT/name,bundle/name,ignore=shutil.ignore_patterns('__pycache__'))
-        for name in ("build.sh","README.md","moon.py","research.py","calibration.py","export_learning.py",
+        for name in ("build.sh","README.md","moon.py","research.py","shared_learning.py","calibration.py","fleet_supervisor.py","export_learning.py",
                      "research.html","ui.html","state.tsv","records.txt","FOUND.tsv","VERIFIED.tsv",
                      "gaps.tsv","jobs.tsv","submitted.txt","table.tsv"):
             if (ROOT/name).exists(): shutil.copy2(ROOT/name,bundle/name)
@@ -28,7 +28,7 @@ def export(destination):
         if source.exists():
             with sqlite3.connect(f"file:{source}?mode=ro",uri=True) as db:
                 with sqlite3.connect(bundle/"learning/research.sqlite3") as target: db.backup(target)
-        for name in ("summary.json","calibration.json","found.tsv"):
+        for name in ("summary.json","calibration.json","found.tsv","shared.json","shared-scale.tsv","known-records.txt","public-bands.json","submissions.json"):
             if (ROOT/"learning"/name).exists(): shutil.copy2(ROOT/"learning"/name,bundle/"learning"/name)
         manifest=dict(created=time.time(),note="SQLite uses online backup. Ordinary log copies may include active work; stop the hunter for a fully quiescent snapshot.")
         (bundle/"backup.json").write_text(json.dumps(manifest,indent=2))
@@ -39,7 +39,7 @@ def export(destination):
     html=(ROOT/"research.html").read_text().replace('<a href="/">← ordinary hunter</a>',
         '<p>saved research snapshot · this page does not run the hunter</p>')
     (pages/"index.html").write_text(html)
-    for source,name in (("summary.json","research.json"),("calibration.json","calibration.json")):
+    for source,name in (("summary.json","research.json"),("calibration.json","calibration.json"),("shared.json","shared.json")):
         if (ROOT/"learning"/source).exists():
             value=json.loads((ROOT/"learning"/source).read_text())
             if source=="summary.json": value.update(status="saved snapshot — no live worker connection",phase="exported for static hosting")

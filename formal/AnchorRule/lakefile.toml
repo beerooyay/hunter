@@ -1,0 +1,6 @@
+name = "anchorRule"
+version = "0.1.0"
+defaultTargets = ["AnchorRule"]
+
+[[lean_lib]]
+name = "AnchorRule"

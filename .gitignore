@@ -29,3 +29,16 @@ python-v3/records.txt
 *.ll
 *.o
 /learning/
+
+/fleet/
+/server.log
+/wifi-proxy.log
+
+/formal/AnchorRule/.lake/
+
+/control.log
+/fleet-output/
+/fleet-input/
+/brain-output/
+
+/phone.log

@@ -1,0 +1,68 @@
+// Shadow cost model v1. All forward/backprop arithmetic executes in Praetor.
+// Q16, six inputs, eight ReLU units, residual output around input 5.
+// stdin: N, then N rows (split, x0..x5, observed); values in [0,65536].
+extern fn rt_brain_row(row: *u64, n: u64) -> i32;
+fn brain_clip(x: i64, low: i64, high: i64) -> i64 {
+    if x < low { return low; } if x > high { return high; } return x;
+}
+fn cmd_brain() -> i32 {
+    let header: [1]u64; header[0]=0;
+    if rt_brain_row(&mut header[0], 1) == 0 { return 2; }
+    let n = header[0]; if n == 0 || n > 200000 { return 2; }
+    let data = rt_alloc64(n * 8); let rows = slice(data, n * 8);
+    let i: u64 = 0;
+    while i < n {
+        if rt_brain_row(&mut rows[i * 8], 8) == 0 { return 2; }
+        if rows[i*8] > 2 { return 2; }
+        let k: u64 = 1; while k < 8 { if rows[i*8+k] > 65536 { return 2; } k=k+1; }
+        i=i+1;
+    }
+    let w: [48]i64; w[0]=0; w[1]=0; w[2]=0; w[3]=0; w[4]=0; w[5]=0; w[6]=0; w[7]=0; w[8]=0; w[9]=0; w[10]=0; w[11]=0; w[12]=0; w[13]=0; w[14]=0; w[15]=0; w[16]=0; w[17]=0; w[18]=0; w[19]=0; w[20]=0; w[21]=0; w[22]=0; w[23]=0; w[24]=0; w[25]=0; w[26]=0; w[27]=0; w[28]=0; w[29]=0; w[30]=0; w[31]=0; w[32]=0; w[33]=0; w[34]=0; w[35]=0; w[36]=0; w[37]=0; w[38]=0; w[39]=0; w[40]=0; w[41]=0; w[42]=0; w[43]=0; w[44]=0; w[45]=0; w[46]=0; w[47]=0; let v: [8]i64; v[0]=0; v[1]=0; v[2]=0; v[3]=0; v[4]=0; v[5]=0; v[6]=0; v[7]=0; let h: [8]i64; h[0]=0; h[1]=0; h[2]=0; h[3]=0; h[4]=0; h[5]=0; h[6]=0; h[7]=0;
+    let j: u64 = 0;
+    while j < 48 { w[j] = (i64((j*17+13)%31)-15)*512; j=j+1; }
+    j=0; while j<8 { v[j]=(i64(j%3)-1)*512; j=j+1; }
+    let bias: i64 = 0;
+    let epoch: u64 = 0;
+    if arg_or(2, "train") == "predict" {
+        let model = rt_alloc64(57); let values = slice(model,57);
+        if rt_brain_row(model,57)==0 { return 2; }
+        j=0; while j<57 { if i64(values[j]) < -131072 || i64(values[j]) > 131072 { return 2; } j=j+1; }
+        j=0; while j<48 { w[j]=i64(values[j]); j=j+1; }
+        j=0; while j<8 { v[j]=i64(values[48+j]); j=j+1; }
+        bias=i64(values[56]); rt_free(model); epoch=12;
+    }
+    let out = out_new(1, 1 << 16);
+    while epoch < 13 {
+        i=0;
+        while i<n {
+            let b=i*8; let y=i64(rows[b+6])+bias;
+            j=0;
+            while j<8 {
+                let z: i64=0; let k: u64=0;
+                while k<6 { z=z+w[j*6+k]*i64(rows[b+1+k])/65536; k=k+1; }
+                h[j]=brain_clip(z,0,131072); y=y+v[j]*h[j]/65536; j=j+1;
+            }
+            let prediction=brain_clip(y,0,65536);
+            if epoch<12 && rows[b]==0 {
+                let error=brain_clip(y-i64(rows[b+7]),-65536,65536);
+                j=0;
+                while j<8 {
+                    let old=v[j];
+                    v[j]=brain_clip(v[j]-error*h[j]/65536/256,-131072,131072);
+                    if h[j]>0 && h[j]<131072 {
+                        let delta=error*old/65536; let k: u64=0;
+                        while k<6 { w[j*6+k]=brain_clip(w[j*6+k]-delta*i64(rows[b+1+k])/65536/256,-131072,131072); k=k+1; }
+                    }
+                    j=j+1;
+                }
+                bias=brain_clip(bias-error/256,-65536,65536);
+            }
+            if epoch==12 { ps(out,"P\t"); pu(out,i); tab(out); pi(out,prediction); pb(out,10); flush(out); }
+            i=i+1;
+        }
+        epoch=epoch+1;
+    }
+    ps(out,"W"); j=0; while j<48 { tab(out); pi(out,w[j]); j=j+1; }
+    j=0; while j<8 { tab(out); pi(out,v[j]); j=j+1; } tab(out); pi(out,bias); pb(out,10); flush(out);
+    rt_free(data); return 0;
+}

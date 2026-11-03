@@ -1,0 +1,51 @@
+{
+  "status": "complete: four paired cases; unpaired timeout work excluded",
+  "cases": [
+    {
+      "case": "known6007-unfiltered",
+      "baseline_cpu": 121.09,
+      "anchors_cpu": 123.53,
+      "baseline_test_wall": 116.0,
+      "anchors_test_wall": 118.4,
+      "records_equal": true,
+      "baseline_record_count": 1,
+      "anchors_record_count": 1,
+      "certified_skips": 0
+    },
+    {
+      "case": "known6007-priced",
+      "baseline_cpu": 125.96,
+      "anchors_cpu": 126.38,
+      "baseline_test_wall": 120.47,
+      "anchors_test_wall": 120.92,
+      "records_equal": true,
+      "baseline_record_count": 1,
+      "anchors_record_count": 1,
+      "certified_skips": 0
+    },
+    {
+      "case": "ordinary6007",
+      "baseline_cpu": 61.55,
+      "anchors_cpu": 72.7,
+      "baseline_test_wall": 53.77,
+      "anchors_test_wall": 64.89,
+      "records_equal": true,
+      "baseline_record_count": 0,
+      "anchors_record_count": 0,
+      "certified_skips": 0
+    },
+    {
+      "case": "ordinary8009",
+      "baseline_cpu": 40.74,
+      "anchors_cpu": 48.21,
+      "baseline_test_wall": 32.13,
+      "anchors_test_wall": 39.5,
+      "records_equal": true,
+      "baseline_record_count": 0,
+      "anchors_record_count": 0,
+      "certified_skips": 0
+    }
+  ],
+  "production_enabled": false,
+  "decision": "record sets matched, but measured CPU did not improve; keep experimental prefilter disabled"
+}

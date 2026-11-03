@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "experiments": [
+    {"id":"word-survivors","name":"Word-wise survivor enumeration","status":"enabled","scope":"Exact enumeration; volume CPU path","evidence":"rt/test_survivors.c; existing default path","gate":"exact survivor equality"},
+    {"id":"cached-deepening","name":"Cached incremental deepening","status":"experimental","scope":"Research probe only","evidence":"44 paired rounds; sieve ratio 0.982x","gate":"equal required coverage and lower total CPU"},
+    {"id":"anchor-volume","name":"Prime-anchor prefilter","status":"rejected","scope":"Native volume","evidence":"4 paired cases matched records; ordinary CPU +18.2%","gate":"preserve records and reduce CPU"},
+    {"id":"cost-mlp-v1","name":"Praetor neural cost model","status":"shadow","scope":"Predict endpoint elapsed cost under existing policy","evidence":"learning/brain/summary.json","gate":"prospective held-out error improvement, then bounded policy experiment; no automatic pruning"}
+  ]
+}

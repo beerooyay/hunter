@@ -1,46 +1,232 @@
-name: Hunter record-first campaign
+name: Hunter fleet evaluation
 on:
   workflow_dispatch:
+    inputs:
+      workers:
+        description: Bounded volume workers (network trains after collection)
+        type: choice
+        options: ['8', '10']
+        default: '8'
+      duration:
+        description: Bounded campaign duration
+        type: choice
+        options: ['30', '300']
+        default: '300'
+permissions:
+  contents: read
+concurrency:
+  group: hunter-fleet-evaluation
+  cancel-in-progress: false
 jobs:
-  hunt-records:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 340
-    permissions:
-      contents: read
-      issues: write
+    timeout-minutes: 20
+    outputs:
+      shards: ${{ steps.matrix.outputs.shards }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install native build dependencies
+      - id: matrix
+        env:
+          WORKERS: ${{ inputs.workers }}
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y clang libgmp-dev cargo
-      - name: Build Praetor
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json,os
+          n=int(os.environ['WORKERS'])
+          assert n in (8,10)
+          print('shards='+json.dumps(list(range(n))))
+          PY
+      - run: sudo apt-get update -qq && sudo apt-get install -y clang libgmp-dev cargo
+      - name: Pinned Praetor compiler
         run: |
-          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
-          cd /tmp/Praetor
-          cargo build --release -p ourc
-      - name: Build Hunter
+          git init /tmp/Praetor
+          git -C /tmp/Praetor remote add origin https://github.com/ceeboozwah/Praetor.git
+          git -C /tmp/Praetor fetch --depth 1 origin e51ddcc577bbb2030c75c0b3bbb2ac2ce85c47cd
+          git -C /tmp/Praetor checkout FETCH_HEAD
+          cd /tmp/Praetor && cargo build --release -p ourc
+      - name: Compile once for every worker
         env:
           OURC: /tmp/Praetor/target/release/ourc
           OUR_RUNTIME: /tmp/Praetor/compiler/runtime
         run: ./build.sh
-      - name: Run record-first search
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 -u native_campaign.py
-      - name: Preserve candidate and learner files
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Model and fleet regression tests
+        run: python3 -m unittest discover -s optimizer -p 'test_*.py' -v
+      - uses: actions/upload-artifact@v4
         with:
-          name: hunter-native-records
-          path: |
-            FOUND.tsv
-            VERIFIED.tsv
-            gaps.tsv
-            jobs.tsv
-            state.tsv
-            hunt.log
-            native-status.json
-            native-server.log
-          retention-days: 7
+          name: fleet-native
+          path: hunter
+          retention-days: 1
+  volume:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: ${{ fromJSON(needs.build.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fleet-native
+      - run: chmod +x hunter
+      - name: Volume checkpoint 1 of 10
+        if: inputs.duration == '300' || 1 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 1 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-1
+          path: fleet-output/
+          retention-days: 2
           if-no-files-found: warn
+      - name: Volume checkpoint 2 of 10
+        if: inputs.duration == '300' || 2 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 2 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-2
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 3 of 10
+        if: inputs.duration == '300' || 3 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 3 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-3
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 4 of 10
+        if: inputs.duration == '300' || 4 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 4 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-4
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 5 of 10
+        if: inputs.duration == '300' || 5 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 5 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-5
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 6 of 10
+        if: inputs.duration == '300' || 6 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 6 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-6
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 7 of 10
+        if: inputs.duration == '300' || 7 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 7 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-7
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 8 of 10
+        if: inputs.duration == '300' || 8 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 8 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-8
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 9 of 10
+        if: inputs.duration == '300' || 9 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 9 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-9
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+      - name: Volume checkpoint 10 of 10
+        if: inputs.duration == '300' || 10 <= 3
+        env:
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_TOTAL_SECONDS: ${{ inputs.duration == '300' && '18000' || '1800' }}
+        run: python3 -u fleet_campaign.py --seconds ${{ inputs.duration == '300' && '1800' || '600' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (inputs.duration == '300' || 10 <= 3)
+        with:
+          name: fleet-${{ github.run_id }}-${{ matrix.shard }}-10
+          path: fleet-output/
+          retention-days: 2
+          if-no-files-found: warn
+  brain:
+    needs: [build, volume]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fleet-native
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fleet-${{ github.run_id }}-*
+          path: fleet-input
+      - run: chmod +x hunter
+      - name: Evaluate frozen model before fitting
+        run: python3 -m optimizer.evaluate
+      - name: Train shared shadow model on deduplicated observations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from optimizer.brain import train
+          train(list(Path('fleet-input').rglob('gaps.tsv')),Path('brain-output'),replay=Path('optimizer/replay.jsonl.gz'))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fleet-brain-${{ github.run_id }}
+          path: brain-output/
+          retention-days: 7
