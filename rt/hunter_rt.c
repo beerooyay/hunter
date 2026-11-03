@@ -23,6 +23,64 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
+
+
+#include <sys/resource.h>
+#ifdef __APPLE__
+#include <libproc.h>
+#endif
+uint64_t rt_accounted_cpu_ns(void) {
+    struct rusage a,b;
+    getrusage(RUSAGE_SELF,&a); getrusage(RUSAGE_CHILDREN,&b);
+    return ((uint64_t)a.ru_utime.tv_sec+a.ru_stime.tv_sec+b.ru_utime.tv_sec+b.ru_stime.tv_sec)*1000000000ull
+       + ((uint64_t)a.ru_utime.tv_usec+a.ru_stime.tv_usec+b.ru_utime.tv_usec+b.ru_stime.tv_usec)*1000;
+}
+uint64_t rt_pid_cpu_ns(uint64_t pid) {
+#ifdef __APPLE__
+    struct rusage_info_v2 r;
+    if(proc_pid_rusage((int)pid,RUSAGE_INFO_V2,(rusage_info_t*)&r)) return 0;
+    return r.ri_user_time+r.ri_system_time;
+#else
+    char path[64],buf[4096];snprintf(path,sizeof(path),"/proc/%llu/stat",(unsigned long long)pid);
+    FILE*f=fopen(path,"r");if(!f)return 0;
+    if(!fgets(buf,sizeof(buf),f)){fclose(f);return 0;}fclose(f);
+    char*p=strrchr(buf,')');if(!p)return 0;p+=2;
+    /* fields 3..13 precede user/system ticks. */
+    for(int i=3;i<14;i++){p=strchr(p,' ');if(!p)return 0;p++;}
+    unsigned long long u,v;if(sscanf(p,"%llu %llu",&u,&v)!=2)return 0;
+    return (u+v)*1000000000ull/(uint64_t)sysconf(_SC_CLK_TCK);
+#endif
+}
+static unsigned char probe_selected[256];
+uint64_t rt_probe_selected(uint64_t k) { return k<256 ? probe_selected[k] : 0; }
+int rt_probe_request(uint64_t *v) {
+    unsigned long long m,n,l,k;
+    if(scanf("%llu %llu %llu %llu",&m,&n,&l,&k)!=4)return 0;
+    if(n>256 || k>n)return 0;
+    memset(probe_selected,0,sizeof(probe_selected));
+    for(unsigned long long i=0;i<k;i++) {
+        unsigned long long j;if(scanf("%llu",&j)!=1 || j>=n)return 0;
+        probe_selected[j]=1;
+    }
+    v[0]=m;v[1]=n;v[2]=l;v[3]=k;return 1;
+}
+
+/* Fail closed on missing, expired or malformed cross-search calibration. */
+uint64_t rt_shared_scale(uint64_t P, uint64_t d) {
+    const uint64_t one = (uint64_t)1 << 32;
+    FILE *f = fopen("learning/shared-scale.tsv", "r");
+    if (!f) return one;
+    unsigned long long p, den, expires; double scale;
+    uint64_t result = one;
+    while (fscanf(f, "%llu %llu %llu %lf", &p, &den, &expires, &scale) == 4) {
+        if (p == P && den == d && expires > (unsigned long long)time(NULL) &&
+            expires <= (unsigned long long)time(NULL) + 1800 &&
+            isfinite(scale) && scale >= .95 && scale <= 1.05) {
+            result = (uint64_t)llround(scale * (double)one); break;
+        }
+    }
+    fclose(f); return result;
+}
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif

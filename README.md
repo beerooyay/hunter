@@ -175,3 +175,10 @@ on your machine and are ignored by git.
   time-boxed, so it can't hang the machine.
 - The Praetor wavefront path that feeds the GPU produces the same output as the sequential CPU path
   in every mathematical column. If a GPU batch ever fails, the hunter redoes that batch with GMP.
+
+### Integrated fleet and cached-depth experiments
+
+See [consolidated engine notes](docs/consolidated-engine.md) for persistent native
+probe requests, measured CPU accounting, research/database backups and the bounded
+10-minute cached-depth experiment. Run `python3 fleet_supervisor.py --dry-run`
+before allocating a self-hosted campaign. GitHub campaign jobs are independent.

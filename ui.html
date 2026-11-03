@@ -52,7 +52,7 @@ body { min-height: 100vh; overflow-x: hidden; }
 .wrap { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 18px 20px 60px; }
 
 /* top bar */
-.top { position: sticky; top: 12px; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; border-radius: 999px; margin-bottom: 18px; flex-wrap: wrap; }
+.top { position: sticky; top: 12px; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: var(--r); margin-bottom: 18px; flex-wrap: wrap; }
 .brand { display: flex; align-items: baseline; gap: 10px; }
 .brand b { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .brand span { color: var(--tx3); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
@@ -172,6 +172,12 @@ svg text { fill: var(--tx3); font: 10px var(--sans); }
 a { color: var(--violet); text-decoration: none; }
 input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: var(--tx); border-radius: 999px; padding: 6px 12px; font: 13px var(--sans); width: 120px; outline: none; }
 @media (max-width: 560px) { .wrap { padding: 12px 16px 40px; } .top { position: relative; top: 0; border-radius: 22px; } .meters { grid-template-columns: 1fr; } .feed .row { grid-template-columns: 84px 50px 1fr 46px; } }
+
+.aurora {display:none} body{background:#0b1115}.glass{backdrop-filter:none;background:#121c22}.glass::before{display:none}
+#research section{margin:20px 0;padding:16px;border:1px solid var(--edge);border-radius:12px}#research .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}#research .card strong{display:block;font-size:24px;color:var(--mint)}#research .scroll{overflow:auto}#research p{color:var(--tx2)}#research h1{font-size:24px}#research h2{font-size:17px}
+
+input[type="number"],input[type="text"],select{color:var(--tx);background:#0d151a;border:1px solid var(--edge);border-radius:12px;padding:8px 10px;font:inherit;max-width:100%}
+button,.field{border-radius:12px}.top{border-radius:var(--r)}.hd{flex-wrap:wrap;gap:8px}.guide{color:var(--tx2);font-size:12px;line-height:1.6;margin:12px 0}.guide summary{cursor:pointer;color:var(--tx)}
 </style>
 </head>
 <body>
@@ -180,7 +186,7 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
 
   <header class="top glass">
     <div class="brand"><b>the hunter</b><span id="eng">praetor</span></div>
-    <a class="pill" href="/research">long-shot lab · merit 30–50</a>
+    <a class="pill" href="#research">shared learning · merit 25–50</a>
     <span class="pill" id="state"><span class="dot"></span><span id="stateTxt">idle</span></span>
     <span class="pill num" id="clock" style="display:none"></span>
     <div class="spacer"></div>
@@ -195,13 +201,24 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
     </div>
   </header>
 
-  <div class="kpis">
+  <details id="research" class="glass" style="padding:20px;margin-bottom:18px"><summary style="cursor:pointer;font-size:17px">research lab · high merits & shared learning</summary><h1>the long-shot lab</h1>
+<p>one persistent worker exploring merits 25, 30, 40, and 50. learning where to search is real; extreme-tail predictions still need evidence.</p>
+<p class="status" id="lab-status">connecting…</p><p id="lab-phase"></p><p id="lab-error" role="status"></p>
+<div class="cards"><div class="card">candidates tested<strong id="lab-tested">—</strong></div><div class="card">best observed merit<strong id="lab-best">—</strong></div><div class="card">verified merit ≥30<strong id="lab-targets">—</strong></div><div class="card">saved research rounds<strong id="lab-rounds">—</strong></div></div>
+<section><h2>observations vs predictions</h2><p>each random control comes from the same refined window as the ranked candidates. this evaluates ranking within those windows, not improvement over all random search. counts include finite-window failures.</p><div class="scroll"><table><thead><tr><th>merit ≥</th><th>ranked observed</th><th>ranked predicted</th><th>control observed</th><th>control predicted</th></tr></thead><tbody id="lab-tiers"></tbody></table></div><small id="lab-sizes"></small></section>
+<section><h2>ordinary hunter calibration</h2><p>right-side prime successes divided by predicted successes across tested survivors. the audit below uses uncorrected probabilities. shared corrections require independent held-out support from both searches.</p><div class="scroll"><table><thead><tr><th>family</th><th>centers</th><th>measured / model</th><th>held-out gain (nats)</th></tr></thead><tbody id="lab-cal"></tbody></table></div><small>good aggregate calibration does not validate the merit 30–50 tail.</small></section>
+<section><h2>verified lab discoveries</h2><div class="scroll"><table><tbody id="lab-finds"></tbody></table></div></section><section><h2>shared evidence</h2><p id="lab-sharedStatus">loading shared memory…</p><p>verified finds from either search update the comparison table used by both. ordinary-search observations inform lab exploration; survivor calibration transfers only when it improves held-out predictions in both domains. each scheduler retains its own cost and yield model.</p><div class="scroll"><table><thead><tr><th>family</th><th>main centers</th><th>completed</th><th>best merit</th><th>≥25 observed</th><th>shared scale</th></tr></thead><tbody id="lab-bands"></tbody></table></div><small>counts are censored by the ordinary stopping policy. they are not unbiased tail probabilities or compute-adjusted success rates.</small></section>
+<section><h2>public record context</h2><p><a href="https://github.com/primegap-list-project/prime-gap-list/commit/140cb8ed5abf3b281c4bcee8837ee48b60ce3da9">your accepted batch: 53 improvements + 8 new gaps</a> · 110 entries credited to b. rouyea in this snapshot.</p><p>the public best is merit 42.5402 at 146 digits (337#/210); merit 42.5192 occurs at 611 digits (1439#/2310). these selected records support exploring smaller families too. they do not measure discovery rate: unsuccessful searches and compute exposure are absent.</p><small>public snapshot: 140cb8e. a merit target of 50 is experimental, not a forecast.</small></section>
+<section><h2>what survives a restart</h2><p>ordinary praetor keeps family performance and multiplier positions. the lab keeps its recipe history, trial outcomes, replayable survivor patterns, and independently rechecked finds in a local database.</p><p>both workers currently run on the mac. opening this page on a phone does not move the computation to the phone or to the cloud.</p><small>verification uses probable-prime endpoint checks and next-prime checks; these are not primality certificates.</small></section>
+</details>
+<div class="glass" style="padding:12px 20px;margin-bottom:16px">live tuning · next-job budget <input id="liveJob" type="number" min="20" max="3600" value="600" style="width:90px"> seconds <button id="applyLive">apply</button><span class="muted"> takes effect as workers start their next jobs; existing jobs finish normally</span></div>
+<div class="kpis">
     <div class="kpi glass"><div class="l">records found</div><div class="v" id="kFound">–</div><div class="h" id="kFoundH">&nbsp;</div></div>
     <div class="kpi glass"><div class="l">centers tested</div><div class="v" id="kTested">–</div><div class="h" id="kTestedH">&nbsp;</div></div>
     <div class="kpi glass"><div class="l">expected records</div><div class="v" id="kExp">–</div><div class="h" id="kExpH">model sum, all time</div></div>
-    <div class="kpi glass"><div class="l">best rate</div><div class="v" id="kRate">–</div><div class="h" id="kRateH">records / core-hour</div></div>
+    <div class="kpi glass"><div class="l">best modeled rate</div><div class="v" id="kRate">–</div><div class="h" id="kRateH">expected records / core-hour</div></div>
     <div class="kpi glass"><div class="l">compute</div><div class="v" id="kCore">–</div><div class="h" id="kCoreH">core-hours</div></div>
-    <div class="kpi glass"><div class="l">stopping bar λ</div><div class="v" id="kLam">–</div><div class="h">records / core-hour</div></div>
+    <div class="kpi glass"><div class="l">stopping bar λ</div><div class="v" id="kLam">–</div><div class="h">expected records / core-hour</div></div>
   </div>
 
   <div class="grid">
@@ -223,9 +240,9 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
     </section>
 
     <section class="card glass s7" id="cLearner">
-      <div class="hd"><h2>where to hunt</h2><span class="sub">thompson sampling over (P, d) — 90% band on records per core-hour</span>
+      <div class="hd"><h2>where to hunt</h2><span class="sub">thompson sampling over (P, d) — 90% model band on expected records per core-hour</span>
         <div class="act"><input class="txt" id="addArm" placeholder="P.d e.g. 5003.210"><button class="mini" id="addB">add</button></div></div>
-      <div class="scroll"><table id="armT"></table></div>
+      <div class="scroll"><p class="guide">each arm is a P#/d search family. est is modeled records per CPU-hour; the band shows 90% model uncertainty. records counts historical finds, so judge it alongside core-hours and tested centers. “learning” means updating the family model, not demonstrated improvement. +g denotes GPU jobs. family selections apply to the next hunt.</p><table id="armT"></table></div>
     </section>
 
     <section class="card glass s5" id="cModel">
@@ -234,7 +251,7 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
     </section>
 
     <section class="card glass s8" id="cRate">
-      <div class="hd"><h2>achieved rate per job</h2><span class="sub">records / core-hour, log scale</span></div>
+      <div class="hd"><h2>modeled yield per job</h2><span class="sub">expected records / core-hour, log scale</span></div><p class="guide">one dot per finished job, positioned at its finish time. color identifies the search family; larger dots mark jobs with a find. each vertical step is ×10. clusters show bursts of job completions and overlapping modeled rates; they do not locate prime-rich regions. zero modeled rates are omitted.</p>
       <div id="chart"></div>
     </section>
 
@@ -264,7 +281,7 @@ input.txt { background: rgba(0,0,0,.22); border: 1px solid var(--edge); color: v
         <input class="txt" id="target" type="number" min="1" max="100" value="43" aria-label="target merit" style="width:70px">
         <button class="mini" id="probeB">score 64 centers</button>
       </div>
-      <p class="muted">experimental model estimates in log space; no hunt or observed hits. same multiplier range and sieve depth for each size. compare the reported model rates, not the number of printed rows.</p>
+      <p class="muted">scores hypothetical target gaps around 64 centers using the sieve model. this tool does not test endpoints or discover records; the research worker does that separately. the gpu/cpu benchmark compares engine performance. both tools require the hunt to be stopped.</p>
     </section>
 
   </div>
@@ -297,8 +314,9 @@ function eatGap(f) {
   const A = S.agg, q = +f[18], tr = +f[11], tl = +f[12], done = f[5] === '1';
   A.n++;
   if (q > 0 && q < 1) {
-    if (+f[7] > 0) { A.nR++; A.sR += tr; A.eR += 1 / q; const u = Math.pow(1 - q, tr - 1); THR.forEach((t, i) => { if (u < t) A.pitR[i]++; }); }
-    if (done) { A.nL++; A.sL += tl; A.eL += 1 / q; const u = Math.pow(1 - q, tl - 1); THR.forEach((t, i) => { if (u < t) A.pitL[i]++; }); }
+    A.sR += q * tr; A.sL += q * tl;
+    if (+f[7] > 0) { A.nR++; A.eR++;  const u = Math.pow(1 - q, tr - 1); THR.forEach((t, i) => { if (u < t) A.pitR[i]++; }); }
+    if (+f[6] > 0) { A.nL++; A.eL++;  const u = Math.pow(1 - q, tl - 1); THR.forEach((t, i) => { if (u < t) A.pitL[i]++; }); }
   }
   const row = { arm: f[0], m: f[1], done, a: f[6], gap: +f[8], merit: +f[9], rec: +f[10], hit: f[15] === '1' };
   if (done) {
@@ -414,7 +432,8 @@ async function pullStatus() {
     const on = st.arms.filter(a => a.on).map(a => a.key);
     S.sel = new Set(lsGet('arms', null) || (on.length ? on : st.arms.slice(0, 8).map(a => a.key)));
   }
-  $('eng').textContent = 'praetor' + (st.gpu.ok ? ' · metal' : '');
+  $('eng').textContent = 'praetor' + (st.gpu.on ? ' · metal' : ' · cpu');
+  if (st.running) { $('cores').value = st.cores; $('gpu').checked = !!st.gpu.on; }
   const pill = $('state'); pill.className = 'pill' + (st.running ? (st.stopping ? ' stopping' : ' on') : '');
   $('stateTxt').textContent = st.running ? (st.stopping ? 'finishing jobs' : `hunting on ${st.cores} core${st.cores > 1 ? 's' : ''}${st.gpu.on ? ' + gpu' : ''}`) : 'idle';
   const clk = $('clock');
@@ -504,10 +523,10 @@ function renderModel() {
   const tail = (arr, n) => n ? arr.map((c, i) => `${(100 * c / n).toFixed(THR[i] < 0.01 ? 2 : 1)}%`).join(' · ') : '–';
   $('modSub').textContent = A.n ? `${fmtN(A.n)} centers` : '';
   $('meters').innerHTML =
-    card('right side: measured / model', rR ? rR.toFixed(3) : '–', rR ? `± ${eR.toFixed(3)} · ${fmtN(A.nR)} gaps` : 'needs tested centers', gauge(rR, eR)) +
-    card('left side: measured / model', rL ? rL.toFixed(3) : '–', rL ? `± ${eL.toFixed(3)} · ${fmtN(A.nL)} gaps` : 'needs completed centers', gauge(rL, eL)) +
-    card('merit ≥ 15: predicted vs seen', pc ? `${pc.toFixed(1)} / ${ch}` : '–', pc ? (Math.abs(ch - pc) <= 2 * Math.sqrt(pc) + 1 ? 'inside 2σ — calibrated' : 'outside 2σ — look closer') : 'after the first jobs') +
-    card('tails vs uniform', A.nR ? tail(A.pitR, A.nR) : '–', 'share below 50 · 10 · 1 · 0.1% — should match', '').replace('class="v num"', 'class="v num sm"');
+    card('right side: measured / model', rR ? rR.toFixed(3) : '–', rR ? `${fmtN(A.nR)} successes · censored trials included` : 'needs tested centers', gauge(rR, eR)) +
+    card('left side: measured / model', rL ? rL.toFixed(3) : '–', rL ? `${fmtN(A.nL)} successes · censored trials included` : 'needs completed centers', gauge(rL, eL)) +
+    card('merit ≥ 15: predicted vs seen', pc ? `${pc.toFixed(1)} / ${ch}` : '–', pc ? (Math.abs(ch - pc) <= 2 * Math.sqrt(pc) + 1 ? 'within rough reference band' : 'outside rough reference band') : 'after the first jobs') +
+    card('completed-right tail ranks', A.nR ? tail(A.pitR, A.nR) : '–', 'below 50 · 10 · 1 · 0.1%; conditional sample, descriptive only', '').replace('class="v num"', 'class="v num sm"');
 }
 
 function renderNear() {
@@ -530,7 +549,7 @@ function renderChart() {
   for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) { const d = new Date(t * 1000); g += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle">${step >= 86400 ? (d.getMonth() + 1) + '/' + d.getDate() : d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0')}</text>`; }
   for (const j of jobs) {
     const c = COLORS[(armIdx[j.arm] || 0) % COLORS.length];
-    g += `<circle cx="${X(j.t)}" cy="${Y(Math.log10(j.rate))}" r="${j.hits ? 6 : 3.2}" fill="${c}" fill-opacity="${j.hits ? 1 : .8}" ${j.kind === 'gpu' ? 'stroke="#fff" stroke-width="1.2"' : ''}><title>${j.arm} · ${fmtE(j.rate)} /core-h${j.hits ? ' · RECORD' : ''}</title></circle>`;
+    g += `<circle cx="${X(j.t)}" cy="${Y(Math.log10(j.rate))}" r="${j.hits ? 6 : 3.2}" fill="${c}" fill-opacity="${j.hits ? 1 : .8}" ${j.kind === 'gpu' ? 'stroke="#fff" stroke-width="1.2"' : ''}><title>${j.arm} · ${new Date(j.t*1000).toLocaleString()} · modeled ${fmtE(j.rate)} /core-h · ${j.hits} finds${j.hits ? ' · RECORD' : ''}</title></circle>`;
   }
   const legend = S.arms.filter(a => jobs.some(j => j.arm === a.key)).map(a => `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px"><i style="width:8px;height:8px;border-radius:50%;background:${COLORS[armIdx[a.key] % COLORS.length]}"></i>${a.P}#/${a.d}</span>`).join('');
   el.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block">${g}</svg><div class="muted" style="font-size:11px;margin-top:6px">${legend}</div>`;
@@ -568,5 +587,27 @@ setInterval(pullGaps, 4000);
 setInterval(() => { pullJobs(); pullSmall(); pullLog(); }, 8000);
 addEventListener('resize', () => { clearTimeout(renderChart.h); renderChart.h = setTimeout(renderChart, 150); });
 </script>
-</body>
+<script>(()=>{
+
+const $=id=>document.getElementById('lab-'+id),fmt=x=>x==null?'—':(Number(x)>0&&Number(x)<.001?Number(x).toExponential(2):Number(x).toLocaleString(undefined,{maximumFractionDigits:3}));
+function row(parent,items){const tr=document.createElement('tr');for(const item of items){const td=document.createElement('td');td.textContent=item;tr.append(td)}parent.append(tr)}
+async function refresh(){try{
+ const response=await fetch('research.json',{cache:'no-store'});if(!response.ok)throw Error('the research worker has not published a checkpoint yet');const s=await response.json();
+ const age=Math.round(Date.now()/1000-s.updated),stale=age>180;
+ $('status').textContent=`${stale?'last checkpoint — ':''}${s.status} · updated ${age}s ago`;$('phase').textContent=s.phase;$('error').textContent='';
+ const a=s.lanes.aimed||{},c=s.lanes.control||{};$('tested').textContent=fmt((a.tested||0)+(c.tested||0));$('best').textContent=fmt(Math.max(a.best||0,c.best||0));$('targets').textContent=fmt(s.verified_targets['30']);$('rounds').textContent=fmt(s.jobs);
+ $('finds').replaceChildren();for(const f of s.finds||[])row($('finds'),[fmt(f.gap),fmt(f.merit),f.expression]);
+ $('tiers').replaceChildren();for(const t of [5,10,15,20,25,30,40,50])row($('tiers'),[t,fmt(a.observed?.[t]||0),fmt(a.predicted?.[t]||0),fmt(c.observed?.[t]||0),fmt(c.predicted?.[t]||0)]);
+ $('sizes').textContent=`ranked: ${a.tested||0} tested, ${a.completed||0} completed. controls: ${c.tested||0} tested, ${c.completed||0} completed. tiny predictions use scientific notation; they are expected counts, not observed hits.`;
+ const cr=await fetch('calibration.json',{cache:'no-store'});if(cr.ok){const cal=await cr.json();$('cal').replaceChildren();for(const [name,v] of Object.entries(cal.arms))row($('cal'),[name,fmt(v.rows),fmt(v.observed_over_expected),fmt(v.holdout_gain_nats)]);}
+ }catch(e){$('error').textContent=e.message}}
+async function shared(){try{
+ const res=await fetch('shared.json',{cache:'no-store'});if(!res.ok)throw Error('shared memory unavailable');const s=await res.json(),fresh=s.expires>Date.now()/1000;
+ const applied=Object.values(s.models).filter(x=>x.applied).length;
+ $('sharedStatus').textContent=`${fresh?'current':'expired; engines fall back to their own models'} · ${applied} shared corrections approved · ${fmt(s.known_gap_sizes)} gap sizes in the common comparison table`;
+ $('bands').replaceChildren();for(const [key,b] of Object.entries(s.bands).sort((a,b)=>b[1].best-a[1].best))row($('bands'),[key.replace(':','#/'),fmt(b.tested),fmt(b.completed),fmt(b.best),fmt(b.tails['25']),fresh&&s.models[key]?.applied?fmt(s.models[key].scale):'baseline']);
+ }catch(e){$('sharedStatus').textContent=e.message}}
+refresh();shared();setInterval(refresh,10000);setInterval(shared,30000);
+
+})();document.getElementById('applyLive').onclick=()=>post('/api/tune',{job:document.getElementById('liveJob').value});</script></body>
 </html>

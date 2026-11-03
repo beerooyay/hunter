@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import calibration
 import research
+import shared_learning
 
 
 class LearningTests(unittest.TestCase):
@@ -47,7 +48,7 @@ class LearningTests(unittest.TestCase):
             folder=Path(name)
             db=research.connect(folder/'state.db')
             first,reason=research.choose(db,30,random.Random(5))
-            self.assertEqual(reason,'warmup')
+            self.assertTrue(reason.startswith('warmup'))
             with db:
                 db.execute("INSERT INTO jobs VALUES(1,?,30,?,?,1,'complete',10,-50,'warmup')",(research.VERSION,*first))
             db.close()
@@ -60,6 +61,14 @@ class LearningTests(unittest.TestCase):
             self.assertEqual(state['recipes'][0]['rounds'],1)
             self.assertTrue((folder/'summary.json').exists())
             db.close()
+
+    def test_transfer_requires_both_domains(self):
+        lower=[(.1,1000,80,False)]*20+[(.1,1000,80,True)]*5
+        higher=[(.1,1000,120,False)]*20+[(.1,1000,120,True)]*5
+        self.assertTrue(shared_learning.transfer(lower,lower)['applied'])
+        self.assertFalse(shared_learning.transfer(lower,higher)['applied'])
+        self.assertFalse(shared_learning.transfer(lower,[])['applied'])
+        self.assertEqual(shared_learning.transfer(lower,[])['scale'],1)
 
     def test_empty_probability(self):
         self.assertEqual(research.logprob(.1,10,[],[1]),-math.inf)

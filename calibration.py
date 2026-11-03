@@ -64,7 +64,7 @@ def audit(root):
                 try:
                     f = line.rstrip("\n").split("\t")
                     key = f[0] + ":" + f[1]
-                    q, n, e = float(f[18]), int(f[11]), int(int(f[7]) > 0)
+                    q, n, e = float(f[21] if len(f)>21 else f[18]), int(f[11]), int(int(f[7]) > 0)
                     if not (0 < q < .5 and n >= e and n > 0):
                         raise ValueError("invalid trial")
                     if key in seen:
@@ -74,7 +74,7 @@ def audit(root):
                     groups.setdefault(f[0], []).append((q, n, e, holdout(key)))
                 except (ValueError, IndexError):
                     invalid += 1
-    result = dict(updated=time.time(), mode="audit only; ordinary hunter q unchanged",
+    result = dict(updated=time.time(), mode="baseline audit; shared_learning separately gates applied corrections",
                   note="Right-side trials, including failed searches. Aggregate agreement does not validate merit 30-50 tails. Repeated holdout checks are descriptive.",
                   invalid_rows=invalid, duplicates=duplicates,
                   arms={k: fit(v) for k, v in groups.items()})

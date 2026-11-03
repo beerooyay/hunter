@@ -18,13 +18,14 @@ import zlib
 
 import gmpy2
 import moon
+import shared_learning
 from calibration import atomic_json, audit, fit, holdout
 
 ROOT = Path(__file__).resolve().parent
-ARMS = [(p, d) for p in (337, 1439, 4001) for d in (210, 2310)]
-TARGETS = (30, 40, 50)
+ARMS = [(p, d) for p in (337, 1439, 4001, 6007, 8009) for d in (210, 2310)]
+TARGETS = (25, 30, 40, 50)
 TIERS = (5, 10, 15, 20, 25, 30, 40, 50)
-VERSION = "target-learner-v1"
+VERSION = "target-learner-v2-shared"
 
 
 def logadd(a, b):
@@ -74,7 +75,12 @@ def choose(db, target, rng):
             stats[p,d].append(value + math.log(3600/seconds))
     untried = [arm for arm, values in stats.items() if not values]
     if untried:
-        return rng.choice(untried), "warmup"
+        evidence=shared_learning.read().get('bands',{})
+        weights=[]
+        for p,d in untried:
+            band=evidence.get(f'{p}:{d}',{})
+            weights.append(1+min(3,1000*band.get('tails',{}).get('20',0)/max(1,band.get('tested',0))))
+        return rng.choices(untried,weights=weights,k=1)[0], "warmup informed by main-search evidence"
     if rng.random() < .2:
         return rng.choice(ARMS), "explore"
     # Shrink short histories toward pooled performance; perturb to preserve uncertainty.
@@ -113,6 +119,7 @@ def summary(db, folder, status, phase="idle"):
         recipes.append(dict(target=t, P=p, d=d, rounds=n, seconds=seconds))
     value = dict(version=VERSION, updated=time.time(), pid=os.getpid(), status=status, phase=phase,
                  lanes=lanes, arms=arms, recipes=recipes,
+                 finds=[dict(gap=g,merit=m,expression=e) for g,m,e in db.execute("SELECT gap,merit,expression FROM finds WHERE verified=1 ORDER BY merit DESC")],
                  jobs=db.execute("SELECT count(*) FROM jobs").fetchone()[0],
                  records=db.execute("SELECT count(*) FROM finds WHERE verified=1 AND local_record=1").fetchone()[0],
                  verified_targets={str(t):db.execute("SELECT count(*) FROM finds WHERE verified=1 AND merit>=?", (t,)).fetchone()[0] for t in TARGETS},
@@ -145,6 +152,7 @@ def run(args):
             expired()
             if time.monotonic()-last_audit > 300:
                 audit(ROOT)
+                shared_learning.refresh(ROOT)
                 last_audit = time.monotonic()
             roundid = db.execute("SELECT coalesce(max(id),0)+1 FROM jobs").fetchone()[0]
             rng = random.Random(f"{VERSION}:{args.seed}:{roundid}")
@@ -159,6 +167,8 @@ def run(args):
             clock = time.monotonic()
             calibration = hazard(db, arm)
             scale = calibration["research_scale"]
+            shared=shared_learning.read(ROOT).get('models',{}).get(f'{arm[0]}:{arm[1]}',{})
+            if shared.get('applied'): scale=shared['scale']
             with tempfile.TemporaryDirectory(prefix="probe-", dir=folder) as tmp:
                 cfg = SimpleNamespace(merit=target)
                 coarse = moon.call(cfg, Path(tmp), deadline, "scout", 1000000, arm, start, args.scout)
@@ -177,7 +187,8 @@ def run(args):
             rng.shuffle(chosen)
             log_yield = -math.inf
             base = gmpy2.primorial(arm[0])//arm[1]
-            baseline_text = (ROOT/"records.txt").read_text()
+            known=ROOT/'learning/known-records.txt'
+            baseline_text = (known if known.exists() else ROOT/"records.txt").read_text()
             baseline = {int(f[0]):float(f[1]) for line in baseline_text.splitlines() if len(f:=line.split())>=2}
             table_hash = hashlib.sha256(baseline_text.encode()).hexdigest()
             for row,lane in chosen:
@@ -246,7 +257,9 @@ def run(args):
             temp = folder/"found.tsv.tmp"
             temp.write_text("".join(f"{g}\t{m:.8f}\t{e}\n" for g,m,e in lines))
             temp.replace(folder/"found.tsv")
-    except (TimeoutError,subprocess.TimeoutExpired) as error:
+    except subprocess.TimeoutExpired:
+        status = "budget exhausted; checkpoint saved"
+    except TimeoutError as error:
         status = str(error)
     except Exception as error:
         status = f"error: {error}"

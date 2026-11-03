@@ -17,7 +17,7 @@ trials are excluded. This is bounded exploration, not evidence of higher yield.
 `python3 research.py --seconds 28800` starts one low-priority worker; gmpy2 is
 required. It scouts with the native Praetor sieve, refines a smaller window,
 and tests 3 ranked candidates plus 1 uniform random control from the same fine
-window. Targets 30, 40, 50 rotate. Six `(P,d)` families are warm-started for each
+window. Targets 25, 30, 40, 50 rotate. Ten `(P,d)` families are warm-started for each
 target. After warmup, 20% of recipe choices are random exploration; otherwise
 the model uses shrunk recent log-yield estimates with uncertainty perturbations.
 This is an adaptive statistical model, not a deep neural network.
@@ -44,8 +44,7 @@ correction; at least 500 training successes, 100 heldout successes, and 2 nats
 of heldout gain are required before the research worker applies it. Repeated
 checks and adjacent-center dependence make this a conservative engineering
 gate, **not** a formal statistical significance test. It calibrates hazards,
-not dependencies or the extreme-gap tail. No ordinary-hunter probability is
-changed by the research calibration.
+not dependencies or the extreme-gap tail. The shared calibration described below can also update ordinary CPU-hunter probabilities. GPU probabilities remain unchanged.
 
 The dashboard `/research` displays observed and predicted counts at merits
 5, 10, 15, 20, 25, 30, 40, 50, separately for ranked and control samples. Controls
@@ -105,3 +104,11 @@ Validation: `python3 -m unittest discover -s rt -p '*learning.py' -v`,
 `python3 rt/mooncheck.py`, native build, staged HTTP/state/cold-start tests,
 and real bounded probe/research runs. No speedup or merit-30+ discovery is
 claimed merely because the architecture is now in place.
+
+## Consolidated fleet and incremental probes
+
+See [consolidated engine notes](consolidated-engine.md). Fleet backups now include
+transactional snapshots of research SQLite databases and shared-learning files,
+with checksums. Measured CPU accounting is separate from conservative admission
+reservations. Persistent Praetor probes reuse setup and retain shallow bitsets
+for selected incremental deepening; production search policy is unchanged.

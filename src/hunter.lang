@@ -19,6 +19,11 @@ import std.thread;
 // ---------------------------------------------------------------- FFI
 extern fn mml_fd_write(fd: i32, buf: *const void, n: u64) -> i64;
 extern fn rt_survivors(bits: *u64, start: u64, limit: u64, out: *u32) -> u64;
+extern fn rt_accounted_cpu_ns() -> u64;
+extern fn rt_pid_cpu_ns(pid: u64) -> u64;
+extern fn rt_probe_request(v: *u64) -> i32;
+extern fn rt_probe_selected(k: u64) -> u64;
+extern fn rt_shared_scale(P: u64, d: u64) -> u64;
 extern fn rt_now_ns() -> u64;
 extern fn rt_cpu_ns() -> u64;
 extern fn rt_unix_s() -> u64;
@@ -576,13 +581,17 @@ fn setbit(b: slice mut u64, i: u64) { b[i >> 6] = b[i >> 6] | (u64(1) << (i & 63
 
 // strike every offset of every center in [mstart, mstart+mb) that has a prime factor <= L
 fn sieve_block(write c: Ctx, mstart: u64, mb: u64) {
+    let empty: str = "";
+    sieve_block_range(c, mstart, mb, 0, false, empty.bytes);
+}
+fn sieve_block_range(write c: Ctx, mstart: u64, mb: u64, first: u64, keep: bool, selected: slice u8) {
     let W = c.words;
-    rt_zero(c.bits, mb * 2 * W * 8);
+    if !keep { rt_zero(c.bits, mb * 2 * W * 8); }
     let bits = slice(c.bits, mb * 2 * W);
     let pr = slice(c.pr, c.np);
     let kr = slice(c.kr, c.np);
     let SL = c.SL;
-    let i: u64 = 0;
+    let i: u64 = first;
     while i < c.np {
         let p = u64(pr[i]);
         let a = u64(kr[i]);
@@ -591,6 +600,9 @@ fn sieve_block(write c: Ctx, mstart: u64, mb: u64) {
             let mr = mstart % p;
             let k: u64 = 0;
             while k < mb {
+                if selected.len > 0 && selected[k] == 0 {
+                    mr = mr + 1; if mr == p { mr = 0; } k = k + 1; continue;
+                }
                 let r = (mr * a) % p;
                 let rt = k * 2 * W;
                 let lf = rt + W;
@@ -620,6 +632,7 @@ fn sieve_block(write c: Ctx, mstart: u64, mb: u64) {
                 if x < 0 { break; }
                 k = k + u64(x);
                 if k >= mb { break; }
+                if selected.len > 0 && selected[k] == 0 { k = k + 1; continue; }
                 let r = (B + a * k) % p;
                 let rt = k * 2 * W;
                 let lf = rt + W;
@@ -930,6 +943,8 @@ fn grp_add(write g: Grp, m: u64, lnN: u64, q: u64, Gc: u64, eL: u64, nR: u64, nL
 
 fn run_engine(write c: Ctx, write o: Out) {
     let t0 = rt_now_ns();
+    let shared_scale = u64(1) << 32;
+    if c.gpu == 0 { shared_scale = rt_shared_scale(c.P, c.d); }
     let rec = slice(c.rec, c.recmax + 1);
     let R = slice(c.R, c.SL + 2);
     let Lf = slice(c.Lf, c.SL + 2);
@@ -999,7 +1014,8 @@ fn run_engine(write c: Ctx, write o: Out) {
             }
             let lnN = c.lnK + ln_q32(m);
             let D = mulsh(lnN, c.lprod, 62);              // lnN * prod, Q32
-            let q = divpow2(94, D);                       // 1 / (lnN * prod), Q62
+            let q_base = divpow2(94, D);
+            let q = mulsh(q_base, shared_scale, 32);       // gated shared calibration
             let omq = ONE - q;
             let nmax = nR;
             if nL > nmax { nmax = nL; }
@@ -1203,6 +1219,7 @@ fn run_engine(write c: Ctx, write o: Out) {
             pfix(o, pcal >> 2, 60, 5); tab(o); pu(o, hitcal); tab(o); pu(o, hit); tab(o);
             psec(o, dt, 3); tab(o); psci(o, scal0, 62, 6); tab(o); psci(o, q, 62, 6); tab(o);
             psci(o, vpol, 62, 6); tab(o); psec(o, mulsh(cpol, tp, 32), 3);
+            tab(o); psci(o, q_base, 62, 6); // preserve baseline for future fitting
             pb(o, 10);
             flush(o);
             k = k + 1;
@@ -2138,7 +2155,10 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     pu(b, P); pb(b, 0); pu(b, d); pb(b, 0); pu(b, m0); pb(b, 0); pu(b, M); pb(b, 0);
     pu(b, av(s, ar, 23)); pb(b, 0); ps(b, "1e9"); pb(b, 0);
     psci(b, muldiv(job_lam, u64(1) << 22, 3600), 62, 6); pb(b, 0);
-    ps(b, "15"); pb(b, 0); ps(b, "records.txt"); pb(b, 0);
+    ps(b, "15"); pb(b, 0);
+    if rt_file_size("learning/known-records.txt") >= 1000000 { ps(b, "learning/known-records.txt"); }
+    else { ps(b, "records.txt"); }
+    pb(b, 0);
     bz(t);
     if dry { ps(t, "HUNT_DRY=1"); pb(t, 0); }
     if isgpu { ps(t, "HUNTER_GPU=1"); pb(t, 0); }
@@ -2369,6 +2389,14 @@ fn status_json(write s: Srv, write b: Out) {
     ps(b, ",\"running\":"); jb(b, s.running); ps(b, ",\"stopping\":"); jb(b, s.stopping);
     ps(b, ",\"started\":"); pu(b, s.started); ps(b, ",\"ends\":"); pu(b, s.ends);
     ps(b, ",\"cores\":"); pu(b, s.cores); ps(b, ",\"ncpu\":"); pu(b, s.ncpu);
+    let cpu = rt_accounted_cpu_ns();
+    let ci: u64 = 0;
+    while ci < MAXW() { if wv(s, ci, 0) != 0 { cpu = cpu + rt_pid_cpu_ns(wv(s, ci, 0)); } ci = ci + 1; }
+    let cv = slice(s.V, 16); ci = 0;
+    while ci < 16 { if cv[ci] != 0 { cpu = cpu + rt_pid_cpu_ns(cv[ci]); } ci = ci + 1; }
+    if s.rec_pid > 0 { cpu = cpu + rt_pid_cpu_ns(u64(s.rec_pid)); }
+    if s.bench_pid > 0 { cpu = cpu + rt_pid_cpu_ns(u64(s.bench_pid)); }
+    ps(b, ",\"cpu_total_ns\":"); pu(b, cpu);
     ps(b, ",\"job_secs\":"); pu(b, s.job_secs);
     ps(b, ",\"gpu\":{\"ok\":"); jb(b, s.gpu_ok); ps(b, ",\"on\":"); jb(b, s.gpu_on); ps(b, ",\"name\":\"");
     let gn = rt_gpu_name();
@@ -2595,6 +2623,14 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
     if p1 < hend && r[p1] == 63 { q0 = p1 + 1; q1 = q0; while q1 < hend && r[q1] != 32 { q1 = q1 + 1; } }
     let body = &r[hend..rq.cap];
     let bl = rq.len - hend;
+    if !post && eqs(r, p0, p1, "/shared.json") {
+        serve_file(conn, "learning/shared.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
+    if !post && eqs(r, p0, p1, "/submissions.json") {
+        serve_file(conn, "learning/submissions.json", "application/json", 0, 1 << 24, b, h);
+        rt_close_fd(conn); return;
+    }
     if !post && eqs(r, p0, p1, "/research") {
         serve_file(conn, "research.html", "text/html; charset=utf-8", 0, 1 << 24, b, h);
         rt_close_fd(conn); return;
@@ -2636,6 +2672,13 @@ fn http_handle(write s: Srv, conn: i64, write rq: Out, write b: Out, write h: Ou
         } } } }
         rt_close_fd(conn);
         return;
+    }
+    if eqs(r, p0, p1, "/api/tune") {
+        let field = kv(body, bl, "job");
+        let seconds = num_at(body, field.lo, field.hi);
+        if seconds < 20 || seconds > 3600 { reply_msg(conn, false, "choose 20 to 3600 seconds", b, h); }
+        else { s.job_secs = seconds; reply_msg(conn, true, "next-job budget updated", b, h); }
+        rt_close_fd(conn); return;
     }
     if eqs(r, p0, p1, "/api/start") {
         let had_table = rt_file_size("records.txt") >= 1000000;
@@ -2799,7 +2842,21 @@ fn cmd_serve() -> i32 {
         if wv(s, i, 0) != 0 { pump(s, i, b, t, rd); let st = rt_reap(i64(wv(s, i, 0))); finish(s, i, st, b, t); }
         i = i + 1;
     }
-    if s.caff > 0 { rt_kill(s.caff, 15); }
+    // Reap verifiers too: retain their OS CPU usage and leave no orphan computation.
+    let shutdown_v = slice(s.V, 16);
+    i = 0; while i < 16 { if shutdown_v[i] != 0 { rt_kill(i64(shutdown_v[i]), 15); } i = i + 1; }
+    rt_sleep_ms(100);
+    i = 0;
+    while i < 16 {
+        if shutdown_v[i] != 0 {
+            let tries: u64 = 0;
+            while rt_reap(i64(shutdown_v[i])) < 0 && tries < 200 { rt_sleep_ms(10); tries = tries + 1; }
+            if tries == 200 { rt_kill(i64(shutdown_v[i]), 9); rt_sleep_ms(20); rt_reap(i64(shutdown_v[i])); }
+            shutdown_v[i] = 0;
+        }
+        i = i + 1;
+    }
+    if s.caff > 0 { rt_kill(s.caff, 15); rt_sleep_ms(20); rt_reap(s.caff); }
     save_state(s, b);
     log_line(b, "control room stopped");
     io.println("bye. state saved.");
@@ -2845,14 +2902,14 @@ fn cmd_verify() -> i32 {
 extern fn rt_probe(m: u64, q: u64, ln: u64, target: u64, right: *u32, nr: u64, left: *u32, nl: u64, nanos: u64);
 extern fn rt_pattern(m: u64, right: *u32, nr: u64, left: *u32, nl: u64);
 
-fn cmd_probe() -> i32 {
+fn cmd_probe(persistent: bool) -> i32 {
     let c = new_ctx();
     c.P = parse_num(arg_or(2, "337"));
     c.d = parse_num(arg_or(3, "210"));
     c.M = parse_num(arg_or(4, "64"));
     let target = parse_num(arg_or(5, "43"));
-    if c.P < 211 || c.P > 4001 || c.d < 1 || c.M < 1 || c.M > 256 || target < 1 || target > 100 {
-        io.eprintln("probe: P 211..4001, d dividing P#, centers 1..256, merit 1..100");
+    if c.P < 211 || c.P > 12007 || c.d < 1 || c.M < 1 || c.M > 256 || target < 1 || target > 100 {
+        io.eprintln("probe: P 211..12007, d dividing P#, centers 1..256, merit 1..100");
         return 1;
     }
     c.m0 = parse_num(arg_or(6, "10000001"));
@@ -2875,17 +2932,52 @@ fn cmd_probe() -> i32 {
     ps(o, "finite-window endpoints only; no claim of calibration at this target.\n");
     ps(o, "m\tlog10(probability)\texpected tests\tlog10(hits/CPU-hour)\n");
     flush(o);
+    let maxnp = c.np;
+    let pr = slice(c.pr, maxnp);
+    let request = rt_alloc64(4);
+    let req = slice(request, 4);
+    let activep = rt_alloc8(256);
+    let active = slice(activep, 256);
+    let cached_start: u64 = 0; let cached_count: u64 = 0; let cached_np: u64 = 0; let cached_depth: u64 = 0;
+    let cache_valid = false;
     let right = slice(c.R, c.SL + 2);
     let left = slice(c.Lf, c.SL + 2);
+    if persistent {
+        bz(o); ps(o, "@setup\t"); pu(o, rt_cpu_ns()); pb(o, 10); flush(o);
+        io.println("worker ready");
+    }
+    while true {
+    let first: u64 = 0; let incremental = false;
+    let request_cpu = rt_cpu_ns(); let request_wall = rt_now_ns();
+    if persistent {
+        if rt_probe_request(request) == 0 { return 0; }
+        request_cpu = rt_cpu_ns(); request_wall = rt_now_ns();
+        if req[0] < 1 || req[0] > 1000000000000 || req[1] < 1 || req[1] > 256 || req[2] < c.P || req[2] > c.L {
+            io.eprintln("invalid probe request"); return 1;
+        }
+        if req[3] > 0 {
+            if !cache_valid || req[0] != cached_start || req[1] != cached_count || req[2] <= cached_depth || req[1] > c.MB {
+                io.eprintln("incremental request requires matching retained shallow batch"); return 1;
+            }
+            incremental = true; first = cached_np;
+            let si: u64 = 0; while si < req[1] { active[si] = u8(rt_probe_selected(si)); si = si + 1; }
+        }
+        c.m0 = req[0]; c.M = req[1];
+        c.np = 0; c.lprod = one62();
+        while c.np < maxnp && u64(pr[c.np]) <= req[2] {
+            c.lprod = c.lprod - c.lprod / u64(pr[c.np]); c.np = c.np + 1;
+        }
+    }
     let b: u64 = 0;
     while b < c.M {
         let count = c.M - b; if count > c.MB { count = c.MB; }
-        sieve_block(c, c.m0 + b, count);
+        if incremental { sieve_block_range(c, c.m0 + b, count, first, true, &active[0..count]); }
+        else { sieve_block(c, c.m0 + b, count); }
         let bits = slice(c.bits, count * 2 * c.words);
         let k: u64 = 0;
         while k < count {
             let m = c.m0 + b + k;
-            if gcd64(m, c.d) == 1 {
+            if gcd64(m, c.d) == 1 && (!incremental || active[k] == 1) {
                 let nr: u64 = 0; let nl: u64 = 0; let off: u64 = 1;
                 while off <= c.SL {
                     let base = k * 2 * c.words;
@@ -2902,7 +2994,14 @@ fn cmd_probe() -> i32 {
         }
         b = b + count;
     }
+    if persistent {
+        cache_valid = !incremental && c.M <= c.MB;
+        cached_start = c.m0; cached_count = c.M; cached_np = c.np; cached_depth = req[2];
+        bz(o); ps(o, "@cost\t"); pu(o, rt_cpu_ns() - request_cpu); tab(o); pu(o, rt_now_ns() - request_wall); pb(o, 10); flush(o);
+    }
     io.println("probe complete; no hunt started and no finds written");
+    if !persistent { return 0; }
+    }
     return 0;
 }
 
@@ -2911,7 +3010,8 @@ fn main() -> i32 {
     if cmd == "serve" { return cmd_serve(); }
     if cmd == "hunt" { return cmd_hunt(); }
     if cmd == "bench" { return cmd_bench(); }
-    if cmd == "probe" { return cmd_probe(); }
+    if cmd == "probe" { return cmd_probe(false); }
+    if cmd == "probe-worker" { return cmd_probe(true); }
     if cmd == "verify" { return cmd_verify(); }
     io.println("the hunter (praetor)");
     io.println("  hunter                        the control room on http://localhost:8765 (same as: hunter serve)");
