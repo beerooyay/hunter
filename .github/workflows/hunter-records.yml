@@ -1,6 +1,11 @@
 name: Hunter record-first campaign
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - cloud/nine-volume-20261105
+    paths:
+      - .github/workflows/hunter-records.yml
 jobs:
   hunt-records:
     name: volume ${{ matrix.arm }} · shard ${{ matrix.shard }}
@@ -14,8 +19,11 @@ jobs:
           - {arm: '6007.210', shard: 1}
           - {arm: '6007.2310', shard: 2}
           - {arm: '6007.2310', shard: 3}
-          - {arm: '8009.210', shard: 4}
-          - {arm: '8009.2310', shard: 5}
+          - {arm: '6007.2310', shard: 4}
+          - {arm: '8009.210', shard: 5}
+          - {arm: '8009.210', shard: 6}
+          - {arm: '8009.2310', shard: 7}
+          - {arm: '8009.2310', shard: 8}
     permissions:
       contents: read
     steps:
@@ -53,5 +61,5 @@ jobs:
             hunt.log
             native-status.json
             native-server.log
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: warn
