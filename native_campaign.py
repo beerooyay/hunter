@@ -11,7 +11,7 @@ def main():
     # Each workflow run reserves one million raw multipliers per family.
     # Retry attempts occupy a separate equally sized block.
     shard=int(os.environ['HUNTER_SHARD'])
-    if not (1<=attempt<=9 and 0<=shard<=5):raise ValueError('unsupported retry or shard')
+    if not (1<=attempt<=9 and 0<=shard<=9):raise ValueError('unsupported retry or shard')
     base=run*100000000+attempt*10000000+shard*1000000+1
     if base+1000000>=2**64:raise ValueError('multiplier exceeds native word size')
     rows=[]
