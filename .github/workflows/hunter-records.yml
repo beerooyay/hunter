@@ -24,6 +24,7 @@ jobs:
           - {arm: '8009.210', shard: 6}
           - {arm: '8009.2310', shard: 7}
           - {arm: '8009.2310', shard: 8}
+          - {arm: '6007.210', shard: 9}
     permissions:
       contents: read
     steps:
