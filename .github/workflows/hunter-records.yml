@@ -1,3 +1,4 @@
+# relaunch 2026-11-10
 name: Hunter record-first campaign
 on:
   workflow_dispatch:
