@@ -1,0 +1,53 @@
+name: Portfolio validation (not a production hunt)
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/portfolio-30-40]
+    paths:
+      - portfolio.py
+      - launch_portfolio.sh
+      - tests/test_portfolio.py
+      - tests/portfolio_native_smoke.py
+      - .github/workflows/portfolio-validation.yml
+permissions:
+  contents: read
+concurrency:
+  group: portfolio-validation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+          python3 -m pip install --break-system-packages gmpy2
+      - name: Test portfolio lifecycle helpers
+        run: |
+          python3 -m py_compile portfolio.py tests/test_portfolio.py tests/portfolio_native_smoke.py
+          bash -n launch_portfolio.sh
+          python3 -m unittest discover -s tests -p test_portfolio.py -v
+      - name: Build existing Praetor engine
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          (cd /tmp/Praetor && cargo build --release -p ourc)
+          OURC=/tmp/Praetor/target/release/ourc OUR_RUNTIME=/tmp/Praetor/compiler/runtime ./build.sh
+          mkdir -p build/portfolio-ci
+          git rev-parse HEAD > build/portfolio-ci/hunter-commit.txt
+          git -C /tmp/Praetor rev-parse HEAD > build/portfolio-ci/praetor-commit.txt
+      - name: Native probability and target-worker smoke tests
+        timeout-minutes: 4
+        run: python3 -u tests/portfolio_native_smoke.py
+      - name: Preserve validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-validation-${{ github.run_id }}
+          path: |
+            build/portfolio-ci/
+            build/ourc.log
+          retention-days: 14
+          if-no-files-found: warn
