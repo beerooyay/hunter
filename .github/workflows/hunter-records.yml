@@ -1,4 +1,4 @@
-# relaunch after run 42979731546
+# relaunch after run 43174011035
 name: Hunter record-first campaign
 on:
   workflow_dispatch:
