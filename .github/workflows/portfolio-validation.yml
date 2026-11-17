@@ -9,6 +9,7 @@ on:
       - tests/test_portfolio.py
       - tests/portfolio_native_smoke.py
       - .github/workflows/portfolio-validation.yml
+      - five_hour_primorial.py
 permissions:
   contents: read
 concurrency:
@@ -161,3 +162,35 @@ jobs:
             build/ourc.log
           retention-days: 14
           if-no-files-found: warn
+
+  five-hour-small-primorial:
+    name: five-hour primorial ${{ matrix.P }}#
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        P: [337, 353, 1439]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+          python3 -m pip install --break-system-packages gmpy2
+      - name: Build Praetor and Hunter
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          (cd /tmp/Praetor && cargo build --release -p ourc)
+          OURC=/tmp/Praetor/target/release/ourc OUR_RUNTIME=/tmp/Praetor/compiler/runtime ./build.sh
+      - name: Run independent five-hour high-merit pilot
+        run: |
+          python3 -u five_hour_primorial.py --P ${{ matrix.P }} --seconds 18000 --seed ${{ github.run_id }} --out build/five-hour-${{ matrix.P }}
+      - name: Save checkpoint and verified hits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: five-hour-primorial-${{ matrix.P }}-${{ github.run_id }}
+          path: build/five-hour-${{ matrix.P }}/
+          if-no-files-found: warn
+          retention-days: 14
