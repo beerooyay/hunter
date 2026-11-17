@@ -1,4 +1,4 @@
-name: Portfolio validation (not a production hunt)
+name: Portfolio validation and 5-hour primorial comparison
 on:
   workflow_dispatch:
   push:
