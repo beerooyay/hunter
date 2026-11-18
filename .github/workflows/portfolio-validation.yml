@@ -1,4 +1,4 @@
-name: Portfolio validation and 5-hour primorial comparison
+name: Primorial 5-hour comparison (relaunch Nov 18)
 on:
   workflow_dispatch:
   push:
