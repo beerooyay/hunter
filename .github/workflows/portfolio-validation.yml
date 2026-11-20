@@ -1,0 +1,196 @@
+name: Five-hour primorial comparison (Nov 19 evening)
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/portfolio-30-40]
+    paths:
+      - portfolio.py
+      - launch_portfolio.sh
+      - tests/test_portfolio.py
+      - tests/portfolio_native_smoke.py
+      - .github/workflows/portfolio-validation.yml
+      - five_hour_primorial.py
+permissions:
+  contents: read
+concurrency:
+  group: portfolio-validation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+          python3 -m pip install --break-system-packages gmpy2
+      - name: Test portfolio lifecycle helpers
+        run: |
+          python3 -m py_compile portfolio.py tests/test_portfolio.py tests/portfolio_native_smoke.py
+          bash -n launch_portfolio.sh
+          python3 -m unittest discover -s tests -p test_portfolio.py -v
+      - name: Build existing Praetor engine
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          (cd /tmp/Praetor && cargo build --release -p ourc)
+          OURC=/tmp/Praetor/target/release/ourc OUR_RUNTIME=/tmp/Praetor/compiler/runtime ./build.sh
+          mkdir -p build/portfolio-ci
+          git rev-parse HEAD > build/portfolio-ci/hunter-commit.txt
+          git -C /tmp/Praetor rev-parse HEAD > build/portfolio-ci/praetor-commit.txt
+      - name: Native probability and target-worker smoke tests
+        timeout-minutes: 4
+        run: python3 -u tests/portfolio_native_smoke.py
+      - name: Equal-budget repeated-window primorial pilot
+        timeout-minutes: 8
+        run: |
+          python3 -u - <<'PY'
+          import json, math, os, random, subprocess, time
+          from pathlib import Path
+          import gmpy2
+          import moon
+          
+          out = Path('build/portfolio-ci')
+          out.mkdir(parents=True, exist_ok=True)
+          regimes = [337, 353, 1439, 6007]
+          budget = 65.0
+          results = []
+          for P in regimes:
+              begun = time.monotonic()
+              deadline = begun + budget
+              d = 2310
+              rng = random.Random(20261117 + P)
+              base = gmpy2.primorial(P) // d
+              lanes = {label: dict(tested=0, completed=0, verified=0,
+                                   merit20=0, merit25=0, merit30=0, best=0.)
+                       for label in ('ranked', 'control')}
+              row = dict(P=P, d=d, budget_s=budget, merit_target=30,
+                         probe_windows=0, candidates_scored=0, lanes=lanes,
+                         status='running', seed=20261117 + P,
+                         sampling='fresh seeded windows; max target-rate and random nonwinner')
+              def checkpoint():
+                  row['elapsed_s'] = round(time.monotonic() - begun, 3)
+                  (out / 'primorial-pilot.json').write_text(
+                      json.dumps(results + [row], indent=2) + '\n')
+              try:
+                  while time.monotonic() < deadline:
+                      remaining = deadline - time.monotonic()
+                      if remaining < 0.25:
+                          break
+                      # Fresh random window every round, not a single fixed window.
+                      first = rng.randrange(100000001, 900000000001)
+                      if first % 2 == 0:
+                          first += 1
+                      env = dict(os.environ, HUNTER_PATTERNS='1')
+                      try:
+                          proc = subprocess.run(
+                              ['./hunter', 'probe', str(P), str(d), '64', '30',
+                               str(first), '1000000'],
+                              env=env, capture_output=True, text=True,
+                              timeout=max(.1, min(remaining, 12.)))
+                      except subprocess.TimeoutExpired:
+                          row['probe_timeouts'] = row.get('probe_timeouts', 0) + 1
+                          checkpoint()
+                          continue
+                      if proc.returncode:
+                          raise RuntimeError('probe returned nonzero: ' + proc.stdout[-300:] +
+                                             proc.stderr[-300:])
+                      candidates = moon.parse(proc.stdout)
+                      row['probe_windows'] += 1
+                      row['candidates_scored'] += len(candidates)
+                      if len(candidates) < 2:
+                          checkpoint()
+                          continue
+                      ranked = sorted(candidates, key=lambda item: item['rate'], reverse=True)
+                      winner = ranked[0]
+                      control = rng.choice(ranked[1:])
+                      # Alternate first lane to avoid systematically starving controls.
+                      choices = [('ranked', winner), ('control', control)]
+                      if row['probe_windows'] % 2 == 0:
+                          choices.reverse()
+                      for label, candidate in choices:
+                          if time.monotonic() >= deadline:
+                              break
+                          lane = lanes[label]
+                          lane['tested'] += 1
+                          center = base * candidate['m']
+                          ends = {}
+                          for side, sign in [('left', -1), ('right', 1)]:
+                              for offset in candidate[side]:
+                                  if time.monotonic() >= deadline:
+                                      break
+                                  if gmpy2.is_bpsw_prp(center + sign * offset):
+                                      ends[side] = offset
+                                      break
+                          if len(ends) != 2:
+                              continue
+                          lane['completed'] += 1
+                          left = center - ends['left']
+                          right = center + ends['right']
+                          gap = ends['left'] + ends['right']
+                          with gmpy2.context(precision=160):
+                              merit = float(gmpy2.mpfr(gap) / gmpy2.log(left))
+                          if time.monotonic() >= deadline:
+                              break
+                          if gmpy2.next_prime(left) != right:
+                              continue
+                          lane['verified'] += 1
+                          lane['best'] = max(lane['best'], round(merit, 6))
+                          for threshold in (20, 25, 30):
+                              if merit >= threshold:
+                                  lane[f'merit{threshold}'] += 1
+                      checkpoint()
+                  row['status'] = 'budget exhausted'
+              except Exception as exc:
+                  row['status'] = 'error: ' + str(exc)[:500]
+              row['elapsed_s'] = round(time.monotonic() - begun, 3)
+              row['total_verified'] = sum(lane['verified'] for lane in lanes.values())
+              row['total_merit30'] = sum(lane['merit30'] for lane in lanes.values())
+              results.append(row)
+              (out / 'primorial-pilot.json').write_text(json.dumps(results, indent=2) + '\n')
+              print(json.dumps(row), flush=True)
+          
+          PY
+      - name: Preserve validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-validation-${{ github.run_id }}
+          path: |
+            build/portfolio-ci/
+            build/ourc.log
+          retention-days: 14
+          if-no-files-found: warn
+
+  five-hour-small-primorial:
+    name: five-hour primorial ${{ matrix.P }}#
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        P: [337, 353, 1439]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+          python3 -m pip install --break-system-packages gmpy2
+      - name: Build Praetor and Hunter
+        run: |
+          git clone --depth 1 https://github.com/ceeboozwah/Praetor.git /tmp/Praetor
+          (cd /tmp/Praetor && cargo build --release -p ourc)
+          OURC=/tmp/Praetor/target/release/ourc OUR_RUNTIME=/tmp/Praetor/compiler/runtime ./build.sh
+      - name: Run independent five-hour high-merit pilot
+        run: |
+          python3 -u five_hour_primorial.py --P ${{ matrix.P }} --seconds 18000 --seed ${{ github.run_id }} --out build/five-hour-${{ matrix.P }}
+      - name: Save checkpoint and verified hits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: five-hour-primorial-${{ matrix.P }}-${{ github.run_id }}
+          path: build/five-hour-${{ matrix.P }}/
+          if-no-files-found: warn
+          retention-days: 14
