@@ -1,4 +1,4 @@
-name: Five-hour primorial comparison (Nov 19 relaunch)
+name: Five-hour primorial comparison (Nov 19 evening)
 on:
   workflow_dispatch:
   push:
