@@ -1,0 +1,153 @@
+name: Hunter merit blitz
+run-name: "100 hunters · 80 baseline + 20 half-cutoff · five hours each"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cloud/merit-blitz-20261121
+    paths:
+      - .github/workflows/hunter-blitz.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hunter-merit-blitz
+  cancel-in-progress: false
+
+jobs:
+  build-and-validate:
+    name: Build, validate and freeze the campaign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require a fresh run and the public standard-runner repository
+        env:
+          REPO_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          test "$GITHUB_RUN_ATTEMPT" = 1 || { echo 'Start a fresh workflow instead of repeating reserved ranges.'; exit 1; }
+          test "$GITHUB_REPOSITORY" = beerooyay/hunter
+          test "$REPO_VISIBILITY" = public
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+      - name: Build the pinned Praetor compiler
+        run: |
+          git init /tmp/Praetor
+          git -C /tmp/Praetor remote add origin https://github.com/ceeboozwah/Praetor.git
+          git -C /tmp/Praetor fetch --depth 1 origin e51ddcc577bbb2030c75c0b3bbb2ac2ce85c47cd
+          git -C /tmp/Praetor checkout --detach FETCH_HEAD
+          cargo build --release -p ourc --manifest-path /tmp/Praetor/Cargo.toml
+      - name: Build Hunter
+        env:
+          OURC: /tmp/Praetor/target/release/ourc
+          OUR_RUNTIME: /tmp/Praetor/compiler/runtime
+        run: ./build.sh
+      - name: Gate the fleet on parser, namespace and real native scheduler checks
+        run: |
+          mkdir -p build/blitz-validation
+          python3 -u blitz_tests.py --native 2>&1 | tee build/blitz-validation/test-output.txt
+      - name: Freeze live records and independently verified local results
+        run: python3 blitz_plan.py --prepare
+      - name: Create the predeclared 100-shard matrix
+        id: plan
+        run: python3 blitz_plan.py --matrix --github-output
+      - name: Package the exact tested binary and record snapshot
+        run: tar -czf hunter-blitz-runtime.tar.gz hunter records.txt build-manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-runtime
+          path: hunter-blitz-runtime.tar.gz
+          retention-days: 90
+          if-no-files-found: error
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-validation
+          path: |
+            build/blitz-validation/**
+            build/ourc.log
+            build-manifest.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  hunt:
+    name: "${{ matrix.arm }} · ${{ matrix.variant }} · shard ${{ matrix.shard }}"
+    needs: build-and-validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      # GitHub enforces the account's actual concurrency; no smaller local cap.
+      matrix: ${{ fromJSON(needs.build-and-validate.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hunter-blitz-runtime
+      - name: Unpack the tested binary and shared record snapshot
+        run: |
+          tar -xzf hunter-blitz-runtime.tar.gz
+          chmod +x hunter
+          ldd ./hunter
+      - name: Hunt for five hours, then drain and verify
+        env:
+          HUNTER_ARM: ${{ matrix.arm }}
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_VARIANT: ${{ matrix.variant }}
+          HUNTER_SECONDS: "18000"
+        run: python3 -u blitz_campaign.py
+      - name: Preserve every shard, including zero-find and partial shards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-result-${{ matrix.shard }}-${{ matrix.arm }}-${{ matrix.variant }}
+          path: |
+            FOUND.tsv
+            VERIFIED.tsv
+            HIGH_MERIT.tsv
+            VERIFIED_HIGH_MERIT.tsv
+            READY.tsv
+            READY.txt
+            PENDING.tsv
+            FAILED.tsv
+            gaps.tsv
+            jobs.tsv
+            job-reservations.tsv
+            state.tsv
+            hunt.log
+            native-status.json
+            native-server.log
+            blitz-*.json
+            blitz-verifiers.log
+            build-manifest.json
+            run/*.out
+          retention-days: 90
+          if-no-files-found: error
+
+  collect:
+    name: Reconcile verified finds, tails and pending checks
+    needs: [build-and-validate, hunt]
+    if: always() && needs.build-and-validate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hunter-blitz-result-*
+          path: build/blitz-shards
+      - name: Reconcile all available shards
+        run: python3 blitz_report.py --aggregate build/blitz-shards build/blitz-aggregate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-aggregate
+          path: build/blitz-aggregate
+          retention-days: 90
+          if-no-files-found: error

@@ -1609,7 +1609,7 @@ struct Srv {
     W: *u64, nw: u64,
     LN: *u8, SM: *u8,
     V: *u64,
-    running: bool, stopping: bool, ends: u64, started: u64, cores: u64,
+    running: bool, stopping: bool, range_exhausted: bool, ends: u64, started: u64, cores: u64,
     gpu_ok: bool, gpu_on: bool, job_secs: u64, lam: u64, scale: u64, caff: i64, rng: u64,
     rec_pid: i64, rec_st: u64, bench_pid: i64, bench_st: u64,
     disc: *u8, dlen: u64, ncpu: u64, port: u64, found: u64,
@@ -2106,6 +2106,25 @@ fn finish(write s: Srv, i: u64, st: i32, write b: Out, write t: Out) {
     save_state(s, b);
 }
 
+fn lambda_percent() -> u64 {
+    // Only the predeclared control and half-cutoff experiment are supported.
+    match process.env("HUNTER_LAMBDA_PERCENT") {
+        Ok(v) => {
+            let p = parse_num(v);
+            if p == 50 || p == 100 { return p; }
+            io.eprintln("HUNTER_LAMBDA_PERCENT must be 50 or 100");
+            process.exit(1);
+        }
+        Err(e) => {}
+    }
+    return 100;
+}
+
+fn multiplier_end() -> u64 {
+    match process.env("HUNTER_M_END") { Ok(v) => { return parse_num(v); } Err(e) => {} }
+    return 0;
+}
+
 fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     let isgpu = s.gpu_on && i == s.nw - 1;
     let c = choose(s, !isgpu);
@@ -2137,6 +2156,29 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     let job_lam = s.lam;
     let cold = !dry && !isgpu && av(s, ar, 8) == 0 && av(s, ar, 65) < 2;
     if cold { M = 20; job_lam = 0; }
+    // A separately labelled exploration lane relaxes the policy, not the math.
+    // Dry pricing and the zero-lambda cold start keep their original behavior.
+    let percent = lambda_percent();
+    if !dry && !cold { job_lam = muldiv(job_lam, percent, 100); }
+    // Cloud shards reserve disjoint, exclusive multiplier intervals. Enforce
+    // that reservation before launching any worker, including the dry price.
+    let mend = multiplier_end();
+    if mend > 0 {
+        if m0 >= mend {
+            s.range_exhausted = true;
+            s.stopping = true;
+            log_line(b, "reserved multiplier range exhausted: finishing current jobs");
+            return;
+        }
+        let allowed = ((mend - m0) / 2) * 2;
+        if allowed < 2 {
+            s.range_exhausted = true;
+            s.stopping = true;
+            log_line(b, "reserved multiplier range exhausted: finishing current jobs");
+            return;
+        }
+        if M > allowed { M = allowed; }
+    }
     aset(s, ar, 3, m0 + M + (M & 1));
     bz(b);
     ps(b, "hunter"); pb(b, 0); ps(b, "hunt"); pb(b, 0);
@@ -2178,6 +2220,15 @@ fn start_job(write s: Srv, i: u64, write b: Out, write t: Out) {
     wset(s, i, 8, u64(fd + 1));
     let lam_now = job_lam;
     wset(s, i, 16, lam_now);
+    // Preserve the selection conditions before the shared learner changes.
+    bz(t);
+    pu(t, rt_unix_s()); tab(t); pu(t, i); tab(t); arm_key(t, s, ar); tab(t);
+    pu(t, m0); tab(t); pu(t, M); tab(t);
+    if dry { pb(t, 49); } else { pb(t, 48); } tab(t);
+    if cold { pb(t, 49); } else { pb(t, 48); } tab(t);
+    pu(t, percent); tab(t); psci(t, s.lam, 40, 8); tab(t);
+    psci(t, job_lam, 40, 8); tab(t); pu(t, mend); pb(t, 10);
+    rt_append("job-reservations.tsv", t.p, t.len);
     // Persist reservations and cold-start attempts promptly, including across restarts.
     save_state(s, t);
 }
@@ -2384,6 +2435,11 @@ fn status_json(write s: Srv, write b: Out) {
     let q: u64 = 0;
     while q < gs.len { if gs[q] != 34 && gs[q] != 92 && gs[q] >= 32 { pb(b, gs[q]); } q = q + 1; }
     ps(b, "\"},\"lambda\":"); psci(b, s.lam, 40, 4);
+    ps(b, ",\"learned_lambda\":"); psci(b, s.lam, 40, 8);
+    ps(b, ",\"effective_lambda\":"); psci(b, muldiv(s.lam, lambda_percent(), 100), 40, 8);
+    ps(b, ",\"lambda_percent\":"); pu(b, lambda_percent());
+    ps(b, ",\"m_end\":\""); pu(b, multiplier_end()); ps(b, "\"");
+    ps(b, ",\"range_exhausted\":"); jb(b, s.range_exhausted);
     ps(b, ",\"price_scale\":"); pfix(b, sc, 32, 4);
     ps(b, ",\"discoverer\":\""); pbs(b, slice(s.disc, 16), 0, s.dlen);
     ps(b, "\",\"tasks\":{\"records\":"); pu(b, s.rec_st); ps(b, ",\"bench\":"); pu(b, s.bench_st);
@@ -2406,6 +2462,7 @@ fn status_json(write s: Srv, write b: Out) {
             ps(b, ",\"digits\":"); pu(b, av(s, ar, 24));
             ps(b, ",\"m0\":"); pu(b, wv(s, i, 2)); ps(b, ",\"M\":"); pu(b, wv(s, i, 3));
             ps(b, ",\"dry\":"); jb(b, wv(s, i, 4) == 1); ps(b, ",\"gpu\":"); jb(b, wv(s, i, 5) == 1);
+            ps(b, ",\"lambda_used\":"); psci(b, wv(s, i, 16), 40, 8);
             ps(b, ",\"started\":"); pu(b, wv(s, i, 6)); ps(b, ",\"tested\":"); pu(b, wv(s, i, 7));
             ps(b, ",\"completed\":"); pu(b, wv(s, i, 19));
             ps(b, ",\"last_gap\":"); pu(b, wv(s, i, 9)); ps(b, ",\"last_merit\":"); pfix(b, wv(s, i, 10), 32, 2);
@@ -2510,6 +2567,7 @@ fn start_hunt(write s: Srv, body: slice u8, n: u64, write b: Out) -> bool {
     if s.gpu_on { s.nw = cores + 1; }
     s.running = true;
     s.stopping = false;
+    s.range_exhausted = false;
     s.started = rt_unix_s();
     s.ends = s.started + mulsh(hours, 3600, 32);
     s.found = 0;
@@ -2757,7 +2815,7 @@ fn cmd_serve() -> i32 {
     let s = Srv {
         A: rt_alloc64(MAXA() * AS()), na: 0, W: rt_alloc64(MAXW() * WS()), nw: 0,
         LN: rt_alloc8(MAXW() * LB()), SM: rt_alloc8(MAXW() * 2048), V: rt_alloc64(16),
-        running: false, stopping: false, ends: 0, started: 0, cores: 0,
+        running: false, stopping: false, range_exhausted: false, ends: 0, started: 0, cores: 0,
         gpu_ok: rt_gpu_available() == 1, gpu_on: false, job_secs: 600, lam: 0, scale: u64(1) << 31, caff: 0,
         rng: rt_now_ns() ^ (u64(rt_getpid()) << 32) ^ 88172645463325252,
         rec_pid: 0, rec_st: 0, bench_pid: 0, bench_st: 0,
