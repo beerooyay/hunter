@@ -151,3 +151,5 @@ jobs:
           path: build/blitz-aggregate
           retention-days: 90
           if-no-files-found: error
+
+# One-time fresh campaign; all search parameters remain unchanged.
