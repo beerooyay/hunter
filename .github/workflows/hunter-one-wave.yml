@@ -1,0 +1,221 @@
+name: Hunter one-wave benchmark
+run-name: "One Hunter wave · 16 baseline + 4 half-cutoff · five hours each"
+
+# Bounded project experiment, manual opt-in only. No push or cron trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      approved_benchmark:
+        description: "Confirm this one-time benchmark is approved for the GitHub-hosted workload"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hunter-merit-blitz
+  cancel-in-progress: false
+
+jobs:
+  build-and-validate:
+    name: Build, validate and freeze the campaign
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.approved_benchmark == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      starts_at: ${{ steps.clock.outputs.starts_at }}
+    steps:
+      - name: Check out the pinned campaign source
+        uses: actions/checkout@v4
+        with:
+          ref: cee4bd9775e404620180045053fc874416a2bcb0
+          persist-credentials: false
+      - name: Check out the benchmark overlay for this workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .one-wave-deployment
+          sparse-checkout: one-wave-overlay
+          persist-credentials: false
+      - name: Install only the reviewed benchmark scripts
+        run: |
+          for f in blitz_plan.py blitz_one_wave.py blitz_one_wave_tests.py; do
+            install -m 0644 ".one-wave-deployment/one-wave-overlay/$f" "$f"
+          done
+      - name: Require a fresh run and the public standard-runner repository
+        env:
+          REPO_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          test "$GITHUB_RUN_ATTEMPT" = 1 || { echo 'Start a fresh workflow instead of repeating reserved ranges.'; exit 1; }
+          test "$GITHUB_REPOSITORY" = beerooyay/hunter
+          test "$REPO_VISIBILITY" = public
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang libgmp-dev cargo python3-gmpy2
+      - name: Build the pinned Praetor compiler
+        run: |
+          git init /tmp/Praetor
+          git -C /tmp/Praetor remote add origin https://github.com/ceeboozwah/Praetor.git
+          git -C /tmp/Praetor fetch --depth 1 origin e51ddcc577bbb2030c75c0b3bbb2ac2ce85c47cd
+          git -C /tmp/Praetor checkout --detach FETCH_HEAD
+          cargo build --release -p ourc --manifest-path /tmp/Praetor/Cargo.toml
+      - name: Build Hunter
+        env:
+          OURC: /tmp/Praetor/target/release/ourc
+          OUR_RUNTIME: /tmp/Praetor/compiler/runtime
+        run: ./build.sh
+      - name: Gate the fleet on parser, namespace and real native scheduler checks
+        run: |
+          set -o pipefail
+          mkdir -p build/blitz-validation
+          python3 -u blitz_one_wave_tests.py
+          python3 -u blitz_tests.py --native 2>&1 | tee build/blitz-validation/test-output.txt
+      - name: Freeze live records and independently verified local results
+        run: python3 blitz_plan.py --prepare --shards 20
+      - name: Create the predeclared 20-shard matrix
+        id: plan
+        run: python3 blitz_plan.py --matrix --shards 20 --github-output
+      - name: Package the exact tested binary and record snapshot
+        run: tar -czf hunter-blitz-runtime.tar.gz hunter records.txt build-manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-runtime
+          path: hunter-blitz-runtime.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-validation
+          path: |
+            build/blitz-validation/**
+            build/ourc.log
+            build-manifest.json
+          retention-days: 3
+          if-no-files-found: warn
+      - name: Set shared UTC kickoff after publishing the runtime
+        id: clock
+        run: echo "starts_at=$(( $(date -u +%s) + 90 ))" >> "$GITHUB_OUTPUT"
+
+  hunt:
+    name: "${{ matrix.arm }} · ${{ matrix.variant }} · shard ${{ matrix.shard }}"
+    needs: build-and-validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.build-and-validate.outputs.matrix) }}
+    steps:
+      - name: Check out the pinned campaign source
+        uses: actions/checkout@v4
+        with:
+          ref: cee4bd9775e404620180045053fc874416a2bcb0
+          persist-credentials: false
+      - name: Check out the benchmark overlay for this workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .one-wave-deployment
+          sparse-checkout: one-wave-overlay
+          persist-credentials: false
+      - name: Install only the reviewed benchmark scripts
+        run: |
+          for f in blitz_plan.py blitz_one_wave.py blitz_one_wave_tests.py; do
+            install -m 0644 ".one-wave-deployment/one-wave-overlay/$f" "$f"
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          name: hunter-blitz-runtime
+      - name: Unpack the tested binary and shared record snapshot
+        run: |
+          tar -xzf hunter-blitz-runtime.tar.gz
+          chmod +x hunter
+          ldd ./hunter
+      - name: Hunt for five hours, then drain and verify
+        env:
+          HUNTER_ARM: ${{ matrix.arm }}
+          HUNTER_SHARD: ${{ matrix.shard }}
+          HUNTER_VARIANT: ${{ matrix.variant }}
+          HUNTER_SECONDS: "18000"
+          HUNTER_STARTS_AT: ${{ needs.build-and-validate.outputs.starts_at }}
+        run: |
+          python3 blitz_one_wave.py start
+          exec python3 -u blitz_campaign.py
+      - name: Preserve every shard, including zero-find and partial shards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-result-${{ matrix.shard }}-${{ matrix.arm }}-${{ matrix.variant }}
+          path: |
+            FOUND.tsv
+            VERIFIED.tsv
+            HIGH_MERIT.tsv
+            VERIFIED_HIGH_MERIT.tsv
+            READY.tsv
+            READY.txt
+            PENDING.tsv
+            FAILED.tsv
+            gaps.tsv
+            jobs.tsv
+            job-reservations.tsv
+            state.tsv
+            hunt.log
+            native-status.json
+            native-server.log
+            blitz-*.json
+            blitz-verifiers.log
+            build-manifest.json
+            run/*.out
+            one-wave-start.json
+          retention-days: 3
+          if-no-files-found: error
+
+  collect:
+    name: Reconcile verified finds, tails and pending checks
+    needs: [build-and-validate, hunt]
+    if: always() && needs.build-and-validate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the pinned campaign source
+        uses: actions/checkout@v4
+        with:
+          ref: cee4bd9775e404620180045053fc874416a2bcb0
+          persist-credentials: false
+      - name: Check out the benchmark overlay for this workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .one-wave-deployment
+          sparse-checkout: one-wave-overlay
+          persist-credentials: false
+      - name: Install only the reviewed benchmark scripts
+        run: |
+          for f in blitz_plan.py blitz_one_wave.py blitz_one_wave_tests.py; do
+            install -m 0644 ".one-wave-deployment/one-wave-overlay/$f" "$f"
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hunter-blitz-result-*
+          path: build/blitz-shards
+      - name: Reconcile all available shards
+        if: always()
+        env:
+          HUNTER_STARTS_AT: ${{ needs.build-and-validate.outputs.starts_at }}
+        run: |
+          python3 blitz_report.py --aggregate build/blitz-shards build/blitz-aggregate
+          python3 blitz_one_wave.py coverage build/blitz-aggregate
+      - name: Preserve partial or complete aggregate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hunter-blitz-aggregate
+          path: build/blitz-aggregate
+          retention-days: 3
+          if-no-files-found: error
